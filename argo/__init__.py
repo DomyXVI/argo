@@ -9,4 +9,4 @@ feed RSS). Obiettivo di questa fase: MISURARE quanti bandi in piu' si
 intercettano crawlando direttamente, rispetto a Google Alerts.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

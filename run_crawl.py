@@ -43,13 +43,14 @@ def main() -> None:
     timeout = cfg["crawl"]["timeout"]
     workers = cfg["crawl"]["workers"]
     threshold = cfg["crawl"]["classifier_threshold"]
+    max_subpages = cfg["crawl"].get("max_subpages", 3)
     by_code = {s["code"]: s for s in schools}
 
     t0 = time.time()
     done = total_hits = new_hits = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(crawl, s["code"], s["trasparenza_url"], threshold,
-                          timeout): s["code"] for s in schools}
+                          timeout, max_subpages): s["code"] for s in schools}
         for fut in as_completed(futs):
             res = fut.result()
             school = by_code[res.code]

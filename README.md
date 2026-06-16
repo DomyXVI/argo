@@ -64,9 +64,27 @@ per spostare il crawl su un Pi.
 
 ## Stato
 
-`v0.1` — scaffold completo e runnable. Da fare prima del lancio "vero":
-- [ ] smoke test discovery+crawl su `--limit` piccolo
-- [ ] primo giro di discovery completo sulle regioni in config
+`v0.2` — scaffold runnable + crawler profondo + classifier migliorato.
+
+Fatto:
+- [x] smoke test discovery+crawl (25 scuole): discovery ~83%, crawl trova bandi reali
+- [x] **crawler profondo**: dall'indice trasparenza scende nelle liste bandi
+  (Bandi di gara/concorso, Albo Pretorio), stesso dominio, `max_subpages` limitato
+- [x] **classifier migliorato** (divergente da v1): tier forte/medio/debole +
+  *veto* per atti a valle (graduatoria/nomina/verbale sui titoli) + *require_strong*
+  sul corpo pagina per non flaggare il rumore dei menu. Test: 8/8 positivi, 8/8 trappole.
+
+Da fare prima del lancio "vero":
+- [ ] primo giro di discovery completo sulle ~29k scuole in config
 - [ ] aggiungere Trentino-AA e Valle d'Aosta (dataset MIUR "AUT" separati)
-- [ ] valutare classificazione sul PDF del bando (non solo anchor/pagina)
-- [ ] 3-4 settimane in parallelo a v1, poi `compare.py`
+- [ ] distinguere **bando aperto** vs atto a valle (verbale/graduatoria) a livello
+  di pagina-lista: serve parsing delle date/scadenze (oggi il match di pagina dice
+  solo "questa scuola ha attivita' esperto esterno", non se il bando e' aperto)
+- [ ] classificazione sul PDF del bando (non solo anchor/pagina)
+- [ ] 3-4 settimane in parallelo a v1, poi `compare.py` per il numero di uplift
+
+### Limiti noti (onesti)
+- Il match a livello di pagina cattura anche atti a valle (verbali/esiti) presenti
+  nell'albo: utile come segnale "c'e' attivita'", impreciso su "bando aperto ora".
+- La categoria di un hit di pagina puo' derivare da parole-menu (es. `coding`,
+  `pon`): cosmetica, non influenza `is_match` (guidato dal segnale forte reale).

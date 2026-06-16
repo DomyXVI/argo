@@ -26,7 +26,8 @@
     "timeout": 10,
     "workers": 24,
     "classifier_threshold": 0.45,
-    "discovery_pause": 0.0
+    "discovery_pause": 0.0,
+    "max_subpages": 3
   },
 
   "_note_workers": "30k domini distinti = 1 richiesta per dominio: alta concorrenza e' educata (non si martella nessun sito). 24 worker ~ 30-50 min per il giro completo, dentro i limiti di un job GitHub Actions."
