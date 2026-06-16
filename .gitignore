@@ -1,0 +1,7 @@
+# DB e CSV scaricato non versionati; gli snapshot JSON SI' (sono i risultati
+# dell'esperimento, vanno committati per il confronto con Alerts nel tempo).
+data/argo.db
+data/scuole_statali.csv
+__pycache__/
+*.pyc
+.DS_Store

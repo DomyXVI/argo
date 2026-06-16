@@ -1,0 +1,63 @@
+name: Argo — crawl giornaliero
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 07:00 IT estate / 06:00 inverno
+  workflow_dispatch:
+    inputs:
+      discovery:
+        description: "Esegui anche la discovery (lenta, di solito mensile)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: argo-crawl
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Lo stato (argo.db + CSV) NON e' versionato: persiste tra run via cache.
+      # Degradazione accettabile se la cache si svuota (si rifa' la discovery).
+      - name: Ripristina cache stato (DB + CSV anagrafe)
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: argo-data-${{ github.run_id }}
+          restore-keys: |
+            argo-data-
+
+      # Discovery: solo su richiesta esplicita, o se manca il DB (primo giro).
+      - name: Discovery (se richiesta o primo giro)
+        run: |
+          if [ "${{ inputs.discovery }}" = "true" ] || [ ! -f data/argo.db ]; then
+            echo "Eseguo la discovery..."
+            python3 run_discovery.py --config config.json
+          else
+            echo "Skip discovery (DB gia' presente)."
+          fi
+
+      - name: Crawl incrementale
+        run: python3 run_crawl.py --config config.json
+
+      - name: Commit snapshot dei risultati
+        run: |
+          git config user.name "argo-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/snapshots/ || true
+          git commit -m "Snapshot crawl $(date +%F)" || { echo "nessuna modifica"; exit 0; }
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push rifiutato, ritento ($i)..."; sleep 5
+          done
+          echo "push fallito"; exit 1

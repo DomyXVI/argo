@@ -1,0 +1,4 @@
+# Argo gira in sola stdlib (urllib, sqlite3, concurrent.futures): nessuna
+# dipendenza esterna richiesta. File presente per coerenza/CI e per eventuali
+# aggiunte future (es. lxml per un parsing HTML piu' robusto, o boto3 se si
+# passa a R2 come storage). Tenuto volutamente vuoto per ora.

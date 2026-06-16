@@ -1,0 +1,33 @@
+{
+  "_commento": "Config di Argo. Le regioni definiscono la copertura: 'Nord+Centro fino al Lazio incluso' (Roma e' in Lazio). Aggiungere/togliere una regione qui e' sufficiente, es. 'ABRUZZO' che e' a cavallo. Trentino-AA e Valle d'Aosta NON sono in questo CSV statali (sono nei dataset MIUR 'AUT' separati): vanno aggiunti a parte quando si vorra' includerli.",
+
+  "regioni": [
+    "PIEMONTE",
+    "LIGURIA",
+    "LOMBARDIA",
+    "VENETO",
+    "FRIULI-VENEZIA G.",
+    "EMILIA ROMAGNA",
+    "TOSCANA",
+    "UMBRIA",
+    "MARCHE",
+    "LAZIO"
+  ],
+
+  "anagrafe": {
+    "csv_url": "https://dati.istruzione.it/opendata/SCUANAGRAFESTAT20252620250901.csv",
+    "csv_cache": "data/scuole_statali.csv"
+  },
+
+  "db": "data/argo.db",
+  "snapshot_dir": "data/snapshots",
+
+  "crawl": {
+    "timeout": 10,
+    "workers": 24,
+    "classifier_threshold": 0.45,
+    "discovery_pause": 0.0
+  },
+
+  "_note_workers": "30k domini distinti = 1 richiesta per dominio: alta concorrenza e' educata (non si martella nessun sito). 24 worker ~ 30-50 min per il giro completo, dentro i limiti di un job GitHub Actions."
+}
