@@ -21,6 +21,7 @@ from pathlib import Path
 
 from argo import anagrafe
 from argo.discovery import discover
+from argo.report import write_discovery_report
 from argo.store import Store
 
 
@@ -67,10 +68,18 @@ def main() -> None:
                       f"trasparenza {found} | {time.time()-t0:.0f}s")
 
     store.log_run("discovery", done, found)
+    store.commit()
+
+    # report leggibili committati nel repo (il DB e' gitignorato)
+    report_path = cfg.get("discovery_report", "data/discovery_report.json")
+    csv_path = cfg.get("schools_map_csv", "data/schools_map.csv")
+    write_discovery_report(store.all_schools(), report_path, csv_path)
     store.close()
+
     print(f"\nFatto. Processate {done} | raggiungibili {reachable} "
           f"({100*reachable/max(done,1):.1f}%) | pagina trasparenza {found} "
           f"({100*found/max(done,1):.1f}%) | {time.time()-t0:.0f}s")
+    print(f"Report:  {report_path}\nMappa:   {csv_path}")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@
 
   "db": "data/argo.db",
   "snapshot_dir": "data/snapshots",
+  "discovery_report": "data/discovery_report.json",
+  "schools_map_csv": "data/schools_map.csv",
 
   "crawl": {
     "timeout": 8,

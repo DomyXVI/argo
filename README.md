@@ -34,6 +34,15 @@ Due fasi distinte:
 3. **Confronto** (`compare.py`) — Argo vs Google Alerts: comuni, esclusivi
    Argo (= uplift), esclusivi Alerts.
 
+### Output (dove vedere i risultati)
+- `data/snapshots/argo-AAAA-MM-GG.json` — **i bandi** trovati dal crawl (uno per
+  giro, committato). Una voce per bando: scuola, provincia, titolo, url, categoria, score.
+- `data/discovery_report.json` — statistiche della mappatura: per regione %
+  raggiungibili e % trasparenza trovata, piattaforme, esiti/errori (committato).
+- `data/schools_map.csv` — mappa per-scuola: codice, nome, piattaforma, url
+  trasparenza, esito (committato, apribile in Excel).
+- `data/argo.db` — stato di lavoro SQLite (gitignorato, vive in `actions/cache`).
+
 ### Accorgimenti già incorporati (dal prototipo validato)
 - **Fallback `.gov.it` → `.edu.it`**: molte scuole sono migrate di TLD ma il CSV
   MIUR riporta il dominio morto. Recupera ~23 punti di raggiungibilità.

@@ -105,6 +105,11 @@ class Store:
                FROM schools WHERE trasparenza_url != ''"""
         ).fetchall()
 
+    def all_schools(self) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM schools ORDER BY region, province, code"
+        ).fetchall()
+
     # --- findings ----------------------------------------------------------
     def record_finding(self, school: sqlite3.Row, title, url, category, score,
                        source_page) -> bool:
