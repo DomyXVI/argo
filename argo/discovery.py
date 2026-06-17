@@ -27,9 +27,32 @@ COMMON_PATHS = [
     "/pvw/app/default/albo_pretorio.php",
 ]
 
+# Probe platform-aware (P2): la piattaforma e' gia' nota via detect_platform(home).
+# Ogni lista e' nell'ordine giusto per quella piattaforma; GLOBAL_FALLBACK resta
+# come coda di sicurezza (de-dup) cosi' nessuna scuola oggi trovata via probe si
+# perde. I path hanno gia' lo slash finale (slash-normalize: ~450 scuole con
+# /albo-online senza slash vengono ora prese subito dal probe invece che dal
+# link_scan piu' costoso).
+PLATFORM_PATHS = {
+    "agid_wordpress": ["/amministrazione-trasparente/", "/albo-online/",
+                       "/amministrazione-trasparente/bandi-di-gara-e-contratti/", "/albo-pretorio/"],
+    "madisoft":       ["/amministrazione-trasparente/", "/albo-online/"],
+    "spaggiari":      ["/amministrazione-trasparente/", "/albo-online/", "/albo-pretorio/"],
+    "axios":          ["/amministrazione-trasparente/", "/albo-online/", "/albo-pretorio/"],
+    "wordpress_generic": ["/amministrazione-trasparente/",
+                          "/amministrazione-trasparente/bandi-di-gara-e-contratti/", "/albo-online/"],
+    "generic":        ["/amministrazione-trasparente/", "/albo-online/", "/albo-pretorio/",
+                       "/index.php/albo-pretorio"],  # CMS Joomla-style (es. IC con index.php)
+    "argo_software":  ["/amministrazione-trasparente/"],
+}
+GLOBAL_FALLBACK = ["/amministrazione-trasparente/", "/albo-online/",
+                   "/amministrazione-trasparente/bandi-di-gara-e-contratti/", "/albo-pretorio/"]
+
 LINK_KEYWORDS = [
     "albo pretorio", "albo online", "amministrazione trasparente",
     "bandi di gara", "bandi e concorsi", "avvisi", "bandi", "concorsi",
+    "trasparenza", "albo", "gara", "incarichi", "bandi di concorso",
+    "personale", "selezione", "reclutamento",
 ]
 
 
@@ -77,8 +100,11 @@ def discover(code: str, site_url: str, timeout: int = 10,
     platform = detect_platform(home.html)
     base = root_of(resolved)
 
-    # 1) probe dei path piu' comuni
-    for path in COMMON_PATHS[:5]:
+    # 1) probe dei path piu' comuni, ordinati per piattaforma (P2).
+    # de-dup mantenendo l'ordine; la coda globale resta come rete di sicurezza.
+    seq = list(dict.fromkeys(
+        PLATFORM_PATHS.get(platform, GLOBAL_FALLBACK) + GLOBAL_FALLBACK))
+    for path in seq:
         if pause:
             time.sleep(pause)
         pr = fetch(base + path, timeout=max(6, timeout - 2))

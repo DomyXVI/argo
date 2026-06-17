@@ -25,12 +25,12 @@
   "schools_map_csv": "data/schools_map.csv",
 
   "crawl": {
-    "timeout": 8,
-    "workers": 64,
+    "timeout": 10,
+    "workers": 48,
     "classifier_threshold": 0.45,
-    "discovery_pause": 0.0,
+    "discovery_pause": 0.05,
     "max_subpages": 3
   },
 
-  "_note_perf": "Benchmark reale su 300 scuole: 64 worker/timeout 8s = ~8 scuole/s -> discovery completa delle ~29k in ~1h (vs 2.3h a 24 worker). Oltre 64 worker il guadagno e' marginale. I domini .gov.it morti danno NXDOMAIN istantaneo (non timeout), quindi abbassare il timeout non perde copertura. 30k domini distinti = 1 richiesta per dominio: alta concorrenza resta educata. Il crawl giornaliero e' piu' leggero della discovery (niente probe). Tutto entro i limiti di un job GitHub Actions (6h)."
+  "_note_perf": "Benchmark reale su campione stratificato fisso di 599 scuole (seed=42, 10 regioni). Ottimizzazioni P1 (early-exit fallback per host NXDOMAIN/timeout/throttled in fetch.py) + P2 (probe platform-aware + reorder + slash-normalize in discovery.py): a 32 worker/timeout 10s la discovery scende da ~119s a ~70s sul campione (proiezione 29k: 1.6h -> 0.9h) con raggiungibilita' invariata 86.8% e trasparenza 85.0%. A 48 worker scende a ~58s (proiezione ~0.8h) con stesso hit rate: quindi workers alzato 32->48. I domini .gov.it morti danno NXDOMAIN istantaneo (non timeout); P1 salta i fallback inutili sullo stesso dominio morto ma mantiene il salto .gov.it->.edu.it (host diverso). Il crawl giornaliero e' piu' leggero della discovery (niente probe). Tutto entro i limiti di un job GitHub Actions (6h)."
 }
