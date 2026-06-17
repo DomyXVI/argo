@@ -54,10 +54,7 @@ jobs:
         run: |
           git config user.name "argo-bot"
           git config user.email "bot@users.noreply.github.com"
+          git pull --rebase origin main
           git add data/snapshots/ data/discovery_report.json data/schools_map.csv || true
           git commit -m "Risultati $(date +%F)" || { echo "nessuna modifica"; exit 0; }
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && exit 0
-            echo "push rifiutato, ritento ($i)..."; sleep 5
-          done
-          echo "push fallito"; exit 1
+          git push
