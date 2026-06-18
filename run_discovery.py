@@ -18,11 +18,24 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from urllib.parse import urlparse
 
 from argo import anagrafe
 from argo.discovery import discover
 from argo.report import write_discovery_report
 from argo.store import Store
+
+
+def _site_key(url: str) -> str:
+    """Chiave di raggruppamento per sito, agnostica a scheme/www/slash finale ma
+    SENSIBILE al path: cosi' i plessi di uno stesso istituto (stesso dominio)
+    collassano, mentre scuole diverse su una piattaforma condivisa
+    (trasparenza-pa.net/scuolaA vs /scuolaB) restano distinte."""
+    p = urlparse(url if "://" in url else "http://" + url)
+    host = p.netloc.lower().split("@")[-1].split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host + p.path.rstrip("/").lower()
 
 
 def main() -> None:
@@ -50,22 +63,44 @@ def main() -> None:
     workers = cfg["crawl"]["workers"]
     pause = cfg["crawl"].get("discovery_pause", 0.0)
 
+    # Dedup per SITO: i plessi di uno stesso istituto condividono il sito, quindi
+    # l'albo va scoperto UNA volta e propagato ai fratelli. Taglia ~6x le richieste
+    # (29k plessi -> ~4.7k siti), spegne il throttling 509 che faceva fallire siti
+    # validi, e fa stare la discovery dentro i limiti Actions. I plessi senza sito
+    # a registro non richiedono fetch: marcati direttamente.
+    by_site: dict[str, list] = {}
+    no_site: list = []
+    for s in schools:
+        if s.website:
+            by_site.setdefault(_site_key(s.website), []).append(s)
+        else:
+            no_site.append(s)
+    reps = [grp[0] for grp in by_site.values()]
+    print(f"Dedup sito: {len(schools)} plessi -> {len(reps)} siti distinti "
+          f"(+{len(no_site)} senza sito a registro)")
+
     t0 = time.time()
     done = found = reachable = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(discover, s.code, s.website, timeout, pause): s
-                for s in schools}
+        futs = {ex.submit(discover, rep.code, rep.website, timeout, pause):
+                _site_key(rep.website) for rep in reps}
         for fut in as_completed(futs):
             d = fut.result()
-            store.update_discovery(d.code, d.resolved_url, d.platform,
-                                   d.trasparenza_url, d.reachable, d.note)
-            done += 1
-            reachable += 1 if d.reachable else 0
-            found += 1 if d.trasparenza_url else 0
-            if done % 200 == 0:
+            # propaga l'esito del sito a TUTTI i plessi che lo condividono
+            for sib in by_site[futs[fut]]:
+                store.update_discovery(sib.code, d.resolved_url, d.platform,
+                                       d.trasparenza_url, d.reachable, d.note)
+                done += 1
+                reachable += 1 if d.reachable else 0
+                found += 1 if d.trasparenza_url else 0
+            if done % 1000 == 0:
                 store.commit()
                 print(f"  {done}/{len(schools)} | raggiungibili {reachable} | "
                       f"trasparenza {found} | {time.time()-t0:.0f}s")
+
+    for s in no_site:
+        store.update_discovery(s.code, "", "unknown", "", False, "no_site_in_csv")
+        done += 1
 
     store.log_run("discovery", done, found)
     store.commit()

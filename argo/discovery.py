@@ -46,13 +46,24 @@ PLATFORM_PATHS = {
     "argo_software":  ["/amministrazione-trasparente/"],
 }
 GLOBAL_FALLBACK = ["/amministrazione-trasparente/", "/albo-online/",
-                   "/amministrazione-trasparente/bandi-di-gara-e-contratti/", "/albo-pretorio/"]
+                   "/amministrazione-trasparente/bandi-di-gara-e-contratti/", "/albo-pretorio/",
+                   "/trasparenza/", "/index.php/amministrazione-trasparente"]
 
 LINK_KEYWORDS = [
     "albo pretorio", "albo online", "amministrazione trasparente",
     "bandi di gara", "bandi e concorsi", "avvisi", "bandi", "concorsi",
     "trasparenza", "albo", "gara", "incarichi", "bandi di concorso",
     "personale", "selezione", "reclutamento",
+]
+
+# Marcatori nell'HREF: quando il probe dei path fallisce, molti siti hanno comunque
+# in home un link all'albo il cui TESTO non e' parlante (un'icona, una voce di
+# menu generica) ma il cui PATH lo tradisce. Cercarli nell'href recupera buona
+# parte dei "no_trasparenza_found" (sito su, albo non agganciato dal solo testo).
+HREF_MARKERS = [
+    "amministrazione-trasparente", "albo-pretorio", "albo-online", "albopretorio",
+    "albo_pretorio", "/trasparenza", "bandi-di-gara", "bandi-di-concorso",
+    "trasparenza-pa", "alboinfoline", "albopop", "/albo",
 ]
 
 
@@ -112,10 +123,15 @@ def discover(code: str, site_url: str, timeout: int = 10,
             return Discovery(code, True, resolved, platform, base + path,
                              "path_probe", "ok")
 
-    # 2) scan dei link in home
-    for href, text in extract_links(home.html, resolved):
-        t = text.lower()
-        if any(k in t for k in LINK_KEYWORDS):
+    # 2) scan dei link in home. Prima l'HREF (il path tradisce l'albo anche con
+    #    testo non parlante), poi il testo del link come prima.
+    links = extract_links(home.html, resolved)
+    for href, _text in links:
+        if any(m in href.lower() for m in HREF_MARKERS):
+            return Discovery(code, True, resolved, platform, href,
+                             "link_href", "ok")
+    for href, text in links:
+        if any(k in text.lower() for k in LINK_KEYWORDS):
             return Discovery(code, True, resolved, platform, href,
                              "link_scan", "ok")
 
