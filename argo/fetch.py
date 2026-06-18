@@ -16,6 +16,7 @@ from __future__ import annotations
 import gzip
 import re
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -162,6 +163,28 @@ class FetchResult:
 # 509 = "Bandwidth Limit Exceeded" tipico degli hosting condivisi (agid_wordpress).
 _RETRY_CODES = (403, 429, 503, 509)
 
+# Politeness PER-HOST: con N worker tutti attivi, le piattaforme che ospitano molte
+# scuole (portaleargo.it, web.spaggiari.eu, trasparenza-pa.net: decine di istituti
+# sullo stesso dominio) verrebbero martellate da decine di richieste insieme,
+# scatenando 429/509 e ban WAF. Un semaforo per dominio registrabile limita la
+# concorrenza verso lo STESSO host, lasciando pieni paralleli i domini distinti.
+PER_HOST_CONCURRENCY = 2
+_host_sems: dict[str, threading.Semaphore] = {}
+_host_sems_lock = threading.Lock()
+
+
+def _host_sem(url: str) -> threading.Semaphore:
+    try:
+        host = _registrable(urlparse(url).netloc)
+    except Exception:
+        host = url
+    with _host_sems_lock:
+        sem = _host_sems.get(host)
+        if sem is None:
+            sem = threading.Semaphore(PER_HOST_CONCURRENCY)
+            _host_sems[host] = sem
+        return sem
+
 
 def fetch(url: str, timeout: int = DEFAULT_TIMEOUT, ua: str = DEFAULT_UA,
           _retry: int = 0, _lax_ssl: bool = False) -> FetchResult:
@@ -176,7 +199,7 @@ def fetch(url: str, timeout: int = DEFAULT_TIMEOUT, ua: str = DEFAULT_UA,
     })
     ctx = _LAX_SSL if _lax_ssl else None
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        with _host_sem(url), urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             raw = resp.read(MAX_BYTES)
             raw = _decompress(raw, resp.headers.get("Content-Encoding", ""))
             charset = resp.headers.get_content_charset() or "utf-8"
@@ -227,7 +250,7 @@ def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT,
     })
     for ctx in (None, _LAX_SSL):
         try:
-            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            with _host_sem(url), urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
                 raw = resp.read(max_bytes)
                 raw = _decompress(raw, resp.headers.get("Content-Encoding", ""))
                 ct = (resp.headers.get_content_type() or "").lower()

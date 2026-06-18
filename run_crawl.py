@@ -72,6 +72,20 @@ def main() -> None:
         store.reset_baseline()
         print("Baseline azzerata (findings svuotati, first_crawled resettato).")
     schools = store.schools_with_trasparenza()
+    # Dedup per trasparenza_url: i plessi di uno stesso istituto comprensivo
+    # condividono la medesima pagina trasparenza. Crawlarla una volta sola taglia
+    # ~75% delle richieste (14.467 -> ~3.550) e con esse il throttling 509/timeout.
+    # Rappresentante STABILE = codice piu' basso del gruppo, cosi' il Delta
+    # Temporale (first_crawled/origin) resta ancorato sempre alla stessa scuola.
+    # NB: dedup per URL completo, non per dominio: piattaforme condivise
+    # (trasparenza-pa.net, spaggiari, argo...) ospitano scuole diverse su path diversi.
+    _grezzo = len(schools)
+    _by_url: dict = {}
+    for s in sorted(schools, key=lambda x: x["code"]):
+        _by_url.setdefault(s["trasparenza_url"], s)
+    schools = list(_by_url.values())
+    if len(schools) < _grezzo:
+        print(f"Dedup trasparenza_url: {_grezzo} plessi -> {len(schools)} pagine distinte")
     if args.limit:
         schools = schools[: args.limit]
     if not schools:
