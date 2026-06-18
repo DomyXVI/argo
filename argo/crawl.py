@@ -16,11 +16,23 @@ domini sono tutti distinti, quindi la concorrenza resta educata per ogni sito.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 from .classifier import classify
 from .fetch import extract_links, fetch_with_fallback, visible_text
+
+# URL di pagine di RICERCA / tassonomia: non sono bandi, vanno ignorate.
+_URL_JUNK = re.compile(
+    r"(/cerca\b|/search\b|/ricerca\b|[?&](cerca|search|s)=|/tag/|/category/|/categoria/)",
+    re.I,
+)
+
+# Gli hit a livello di PAGINA INTERA (testo, non link) sono piu' rumorosi: il
+# titolo e' uno snippet del corpo e spesso il punteggio viene da parole-menu.
+# Pretendiamo una soglia piu' alta che per gli anchor, dove il titolo e' pulito.
+PAGE_BODY_MIN_SCORE = 0.70
 
 # Testi/href che indicano una LISTA di bandi da seguire (drill-down).
 LISTING_HINTS = [
@@ -80,6 +92,8 @@ def _scan_page(html: str, page_url: str, threshold: float,
     for href, text in extract_links(html, page_url):
         if not text or len(text) < MIN_ANCHOR_LEN:
             continue
+        if _URL_JUNK.search(href):
+            continue
         c = classify(text, title=text, threshold=threshold)
         if c.is_match:
             prev = hits.get(href)
@@ -90,9 +104,10 @@ def _scan_page(html: str, page_url: str, threshold: float,
     # bando vero) ma require_strong attivo: serve un segnale forte ancorato a
     # "esperto", per non flaggare pagine il cui punteggio viene da parole-menu.
     body = visible_text(html)
-    page_c = classify(body, title="", threshold=threshold, veto=False,
+    page_threshold = max(threshold, PAGE_BODY_MIN_SCORE)
+    page_c = classify(body, title="", threshold=page_threshold, veto=False,
                       require_strong=True)
-    if page_c.is_match and page_url not in hits:
+    if page_c.is_match and page_url not in hits and not _URL_JUNK.search(page_url):
         hits[page_url] = Hit(_best_snippet(body), page_url, page_c.category,
                              page_c.score)
 

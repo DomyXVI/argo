@@ -1,4 +1,6 @@
-# Argo gira in sola stdlib (urllib, sqlite3, concurrent.futures): nessuna
-# dipendenza esterna richiesta. File presente per coerenza/CI e per eventuali
-# aggiunte future (es. lxml per un parsing HTML piu' robusto, o boto3 se si
-# passa a R2 come storage). Tenuto volutamente vuoto per ora.
+# Argo gira quasi interamente in sola stdlib (urllib, sqlite3, concurrent.futures).
+# Unica dipendenza esterna: pypdf, usata SOLO da argo/scadenza.py per leggere la
+# scadenza dei bandi dai PDF allegati (di norma non e' nell'HTML della pagina).
+# L'import e' protetto: se pypdf manca, la scadenza resta "ignota" e il resto del
+# crawler funziona comunque.
+pypdf>=4.0

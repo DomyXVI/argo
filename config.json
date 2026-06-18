@@ -32,5 +32,12 @@
     "max_subpages": 3
   },
 
+  "_note_scadenza": "Estrazione scadenza (HTML-first, fallback PDF via pypdf). Concorrenza piu' bassa del crawl: scarica i PDF allegati, percio' piu' banda per richiesta. max_per_run limita i findings processati a ogni giro: 0 = tutti (al bootstrap puo' essere lento, ma e' resumable - ogni finding viene marcato come controllato). Alzare/abbassare in base ai tempi del job Actions.",
+  "scadenza": {
+    "workers": 12,
+    "timeout": 12,
+    "max_per_run": 0
+  },
+
   "_note_perf": "Benchmark reale su campione stratificato fisso di 599 scuole (seed=42, 10 regioni). Ottimizzazioni P1 (early-exit fallback per host NXDOMAIN/timeout/throttled in fetch.py) + P2 (probe platform-aware + reorder + slash-normalize in discovery.py): a 32 worker/timeout 10s la discovery scende da ~119s a ~70s sul campione (proiezione 29k: 1.6h -> 0.9h) con raggiungibilita' invariata 86.8% e trasparenza 85.0%. A 48 worker scende a ~58s (proiezione ~0.8h) con stesso hit rate: quindi workers alzato 32->48. I domini .gov.it morti danno NXDOMAIN istantaneo (non timeout); P1 salta i fallback inutili sullo stesso dominio morto ma mantiene il salto .gov.it->.edu.it (host diverso). Il crawl giornaliero e' piu' leggero della discovery (niente probe). Tutto entro i limiti di un job GitHub Actions (6h)."
 }

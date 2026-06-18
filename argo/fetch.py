@@ -215,6 +215,32 @@ def fetch(url: str, timeout: int = DEFAULT_TIMEOUT, ua: str = DEFAULT_UA,
         return FetchResult(False, None, None, "", f"{type(e).__name__} {e}", time.time() - t0)
 
 
+def fetch_bytes(url: str, timeout: int = DEFAULT_TIMEOUT,
+                max_bytes: int = 6_000_000) -> tuple[bool, str, bytes]:
+    """Scarica un URL come byte grezzi (per i PDF: non vanno decodificati come
+    testo). Ritorna (ok, content_type, data). Best-effort: in caso di errore
+    (ok=False, "", b\"\"). Riusa UA/SSL permissivo come fetch()."""
+    req = urllib.request.Request(url, headers={
+        "User-Agent": DEFAULT_UA,
+        "Accept": "application/pdf,*/*",
+        "Accept-Encoding": "gzip, deflate",
+    })
+    for ctx in (None, _LAX_SSL):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                raw = resp.read(max_bytes)
+                raw = _decompress(raw, resp.headers.get("Content-Encoding", ""))
+                ct = (resp.headers.get_content_type() or "").lower()
+                return True, ct, raw
+        except urllib.error.URLError as e:
+            if ctx is None and isinstance(getattr(e, "reason", None), ssl.SSLError):
+                continue  # ritenta col contesto permissivo
+            return False, "", b""
+        except Exception:
+            return False, "", b""
+    return False, "", b""
+
+
 def fetch_with_fallback(url: str, timeout: int = DEFAULT_TIMEOUT) -> FetchResult:
     """Prova l'URL; se fallisce, ritenta sui candidati (.edu.it, scheme alt).
 

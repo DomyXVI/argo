@@ -92,14 +92,34 @@ NEGATIVE_GUARDS = [
 # Applicato solo ai titoli brevi (`veto=True`), NON al corpo lungo di una pagina
 # -lista, dove queste parole possono comparire accanto a un bando aperto vero.
 VETO_MARKERS = [
-    r"graduatoria",
-    r"\bnomina\b",
+    # --- atti a VALLE del bando (selezione gia' chiusa/decisa) ---
+    r"graduatori\w*",
+    r"\bnomin[ae]\b",
     r"commissione giudicatrice",
     r"aggiudicazi\w+",
     r"\bverbale\b",
     r"esito .{0,20}?selezione",
     r"\bconvocazione\b",
     r"avviso di rettifica",
+    r"decreto\b.{0,40}(conferimento|attribuzione|approvazione)",
+    r"determin\w+.{0,40}(conferimento|attribuzione|aggiudicaz)",
+    r"autoattestazione",
+    r"autovalutazione",
+    r"valutazione delle candidature",
+    # --- NON sono bandi: allegati, moduli, regolamenti, CV ---
+    r"\bscheda\b",
+    r"modulistic",
+    r"\bmodulo (di )?(domanda|richiesta|volontari|autorizzazione|ingresso)",
+    r"modello (di |per )?(domanda|richiesta|autorizzazione|ingresso)",
+    r"dichiarazione sostitutiva",
+    r"curriculum vitae",
+    r"\bcv\b",
+    r"\bregolamento\b",
+    r"autorizzazione ingresso",
+    # --- header/landing di pagina, non un bando specifico ---
+    r"^(albo (online|pretorio)|amministrazione trasparente)\b",
+    r"bandi di gara[ \-]",
+    # --- contesto sbagliato: selezione riservata al personale interno ---
     r"espert[oi] intern[oi]",
     r"personale (docente )?intern[oi]",
     r"riservat[oa] al personale intern",

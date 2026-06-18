@@ -9,6 +9,10 @@ on:
         description: "Esegui anche la discovery (lenta, di solito mensile)"
         type: boolean
         default: false
+      reset:
+        description: "Deploy pulito: azzera findings + first_crawled (una tantum dopo un cambio di schema/fingerprint)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,6 +30,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Installa dipendenze (pypdf per la scadenza)
+        run: pip install -r requirements.txt
 
       # Lo stato (argo.db + CSV) NON e' versionato: persiste tra run via cache.
       # Degradazione accettabile se la cache si svuota (si rifa' la discovery).
@@ -48,13 +55,24 @@ jobs:
           fi
 
       - name: Crawl incrementale
-        run: python3 run_crawl.py --config config.json
+        run: |
+          RESET=""
+          if [ "${{ inputs.reset }}" = "true" ]; then RESET="--reset"; fi
+          python3 run_crawl.py --config config.json $RESET
 
       - name: Commit risultati (snapshot bandi + report discovery)
         run: |
           git config user.name "argo-bot"
           git config user.email "bot@users.noreply.github.com"
-          git pull --rebase origin main
-          git add data/snapshots/ data/discovery_report.json data/schools_map.csv || true
+          git add data/snapshots/ data/discovery_report.json data/schools_map.csv
           git commit -m "Risultati $(date +%F)" || { echo "nessuna modifica"; exit 0; }
-          git push
+          # Lo snapshot odierno puo' collidere con uno gia' su main (stesso giorno):
+          # rebase -X theirs tiene la NOSTRA versione (i commit riapplicati). Retry
+          # per gestire una corsa con un altro push concorrente.
+          for i in 1 2 3; do
+            git fetch origin main
+            if git rebase -X theirs origin/main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            echo "push fallito, ritento ($i)..."; sleep 5
+          done
+          echo "push fallito dopo 3 tentativi"; exit 1
