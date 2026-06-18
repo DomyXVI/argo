@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BandIT — bandi esperti esterni</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f6f8; --surface:#fff; --surface-2:#f0f0f3; --surface-3:#e9e9ee;
+  --text:#16161a; --muted:#6a6a76; --faint:#9a9aa6;
+  --border:rgba(20,20,28,.09); --border-2:rgba(20,20,28,.16);
+  --accent:#5b54e6; --accent-text:#4a43d6; --accent-soft:#edecfd;
+  --green:#138a52; --green-soft:#e3f5ec; --red:#c63b3b; --red-soft:#fbeaea;
+  --amber:#9a6a10; --amber-soft:#fbf0d9;
+}
+:root[data-theme="dark"]{
+  --bg:#0d0d10; --surface:#17171c; --surface-2:#1f1f26; --surface-3:#26262f;
+  --text:#ededf2; --muted:#9c9caa; --faint:#6c6c78;
+  --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.17);
+  --accent:#8b84ff; --accent-text:#a9a3ff; --accent-soft:#22203f;
+  --green:#3ec98a; --green-soft:#11261d; --red:#f0726f; --red-soft:#2c1616;
+  --amber:#e0a437; --amber-soft:#2a2110;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);
+  line-height:1.5;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+a{color:inherit;text-decoration:none}
+
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.hrow{display:flex;align-items:center;gap:14px;padding:14px 0}
+.logo{display:flex;align-items:baseline;gap:1px;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.logo b{color:var(--accent-text);font-weight:600}
+.tag{font-size:13px;color:var(--muted);margin-left:4px}
+.spacer{flex:1}
+.iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text);cursor:pointer;display:grid;place-items:center;font-size:17px;transition:.15s}
+.iconbtn:hover{background:var(--surface-2);border-color:var(--border-2)}
+.updated{font-size:12.5px;color:var(--faint)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;
+  transition:.15s;position:relative}
+.stat:hover{border-color:var(--border-2)}
+.stat.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.stat .n{font-size:27px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.stat .l{font-size:12.5px;color:var(--muted);margin-top:3px}
+.stat .dot{width:8px;height:8px;border-radius:50%;position:absolute;top:17px;right:16px}
+
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+.search{position:relative;flex:1;min-width:220px}
+.search i{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:16px}
+input,select{font-family:inherit;font-size:14px;color:var(--text);background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;height:40px;transition:.15s;outline:none}
+input{width:100%;padding:0 12px 0 38px}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+select{padding:0 32px 0 12px;cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a9aa6' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+.count{font-size:13px;color:var(--muted);margin-bottom:14px}
+.count b{color:var(--text);font-weight:500}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;padding-bottom:60px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:17px 18px;
+  display:flex;flex-direction:column;gap:12px;transition:.16s}
+.card:hover{border-color:var(--border-2);transform:translateY(-2px)}
+.ctop{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.pill{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.pill .d{width:6px;height:6px;border-radius:50%}
+.p-aperto{background:var(--green-soft);color:var(--green)}
+.p-scaduto{background:var(--red-soft);color:var(--red)}
+.p-ignota{background:var(--amber-soft);color:var(--amber)}
+.new{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-text);
+  background:var(--accent-soft);padding:3px 8px;border-radius:6px}
+.title{font-size:15px;font-weight:500;line-height:1.4;letter-spacing:-.01em;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.school{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.school i{font-size:15px;color:var(--faint)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag2{font-size:12px;color:var(--accent-text);background:var(--accent-soft);padding:3px 9px;border-radius:7px}
+.tag2.cat{color:var(--muted);background:var(--surface-2)}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--muted);
+  border-top:1px solid var(--border);padding-top:12px;margin-top:2px}
+.scad{display:flex;align-items:center;gap:6px}.scad i{font-size:15px}
+.conf{display:flex;flex-direction:column;gap:5px;min-width:112px}
+.conf .lab{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--faint)}
+.bar{height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.open{font-size:13px;font-weight:500;color:var(--accent-text);display:inline-flex;align-items:center;gap:5px}
+.disco{font-size:11.5px;color:var(--faint)}
+
+.empty{text-align:center;padding:80px 20px;color:var(--muted)}
+.empty i{font-size:42px;color:var(--faint);display:block;margin-bottom:14px}
+.skel{height:210px;border-radius:16px;background:var(--surface-2);animation:pulse 1.3s infinite}
+@keyframes pulse{50%{opacity:.5}}
+footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:var(--faint);text-align:center}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.tag{display:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap hrow">
+  <span class="logo">Band<b>IT</b></span>
+  <span class="tag">bandi per esperti esterni · scuole italiane</span>
+  <span class="spacer"></span>
+  <span class="updated" id="updated"></span>
+  <button class="iconbtn" id="theme" aria-label="Cambia tema"><i class="ti ti-moon"></i></button>
+</div></header>
+
+<main class="wrap">
+  <div class="stats" id="stats"></div>
+  <div class="filters">
+    <div class="search"><i class="ti ti-search"></i>
+      <input id="q" placeholder="Cerca per scuola, titolo, profilo…" autocomplete="off"></div>
+    <select id="cat"><option value="">Tutte le categorie</option></select>
+    <select id="reg"><option value="">Tutte le regioni</option></select>
+    <select id="sort">
+      <option value="recent">Più recenti</option>
+      <option value="scad">Scadenza più vicina</option>
+      <option value="conf">Confidence più alta</option>
+    </select>
+  </div>
+  <div class="count" id="count"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<footer class="wrap">BandIT · dati pubblici da amministrazione trasparente / albo pretorio delle scuole</footer>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.1.0/dist/tabler-icons.min.css">
+<script>
+const CATLAB={generico:"Generico",madrelingua:"Madrelingua",psicologo:"Psicologo",coding:"Coding",
+  robotica:"Robotica",digitale:"Digitale",sicurezza:"Sicurezza / RSPP",formazione:"Formazione",
+  dm219:"DM 219",pon_progettista_collaudatore:"PON progettista/collaudatore"};
+const STATO_ORDER={aperto:0,ignota:1,scaduto:2};
+let DATA=[], FILT={stato:"aperto"};
+
+function fmtDate(s){if(!s)return"—";const d=new Date(s);return isNaN(d)?"—":
+  d.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"})}
+function daysAgo(s){const d=new Date(s);if(isNaN(d))return"";const n=Math.floor((Date.now()-d)/864e5);
+  return n<=0?"oggi":n===1?"ieri":n+" giorni fa"}
+function ambito(f){return f.profilo||CATLAB[f.category]||f.category||"—"}
+function titolo(f){return f.titolo_pulito||(f.title||"").replace(/\s+/g," ").trim()||"(senza titolo)"}
+
+function theme(t){document.documentElement.dataset.theme=t;
+  document.querySelector("#theme i").className="ti ti-"+(t==="dark"?"sun":"moon");
+  try{localStorage.bandit_theme=t}catch(e){}}
+document.getElementById("theme").onclick=()=>theme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+
+function renderStats(){
+  const c={aperto:0,scaduto:0,ignota:0};DATA.forEach(f=>c[f.stato]++);
+  const cards=[["",DATA.length,"Totale",null],["aperto",c.aperto,"Aperti","var(--green)"],
+    ["scaduto",c.scaduto,"Scaduti","var(--red)"],["ignota",c.ignota,"Scadenza ignota","var(--amber)"]];
+  document.getElementById("stats").innerHTML=cards.map(([s,n,l,col])=>
+    `<div class="stat ${FILT.stato===s?'on':''}" data-s="${s}"><div class="n">${n}</div>
+     <div class="l">${l}</div>${col?`<span class="dot" style="background:${col}"></span>`:""}</div>`).join("");
+  document.querySelectorAll(".stat").forEach(el=>el.onclick=()=>{FILT.stato=el.dataset.s;render()});
+}
+function fillSelects(){
+  const cats=[...new Set(DATA.map(f=>f.category))].sort();
+  document.getElementById("cat").innerHTML='<option value="">Tutte le categorie</option>'+
+    cats.map(c=>`<option value="${c}">${CATLAB[c]||c}</option>`).join("");
+  const regs=[...new Set(DATA.map(f=>f.region))].sort();
+  document.getElementById("reg").innerHTML='<option value="">Tutte le regioni</option>'+
+    regs.map(r=>`<option value="${r}">${r.charAt(0)+r.slice(1).toLowerCase()}</option>`).join("");
+}
+function card(f){
+  const pct=Math.round((f.score||0)*100);
+  const isNew=f.origin==="nuovo";
+  return `<div class="card">
+    <div class="ctop">
+      <span class="pill p-${f.stato}"><span class="d" style="background:currentColor"></span>${f.stato}</span>
+      ${isNew?'<span class="new">nuovo</span>':''}
+    </div>
+    <div class="title">${titolo(f)}</div>
+    <div class="school"><i class="ti ti-school"></i>${f.school_name} · ${(f.province||"").toLowerCase().replace(/\b\w/g,m=>m.toUpperCase())}</div>
+    <div class="tags"><span class="tag2">${ambito(f)}</span>
+      ${f.profilo?`<span class="tag2 cat">${CATLAB[f.category]||f.category}</span>`:''}</div>
+    <div class="meta">
+      <span class="scad"><i class="ti ti-calendar-event"></i>${f.scadenza?("scade "+fmtDate(f.scadenza)):"scadenza ignota"}</span>
+      <span class="conf"><span class="lab"><span>confidence</span><span>${pct}%</span></span>
+        <span class="bar"><i style="width:${pct}%"></i></span></span>
+    </div>
+    <div class="foot">
+      <a class="open" href="${f.url}" target="_blank" rel="noopener">Apri bando <i class="ti ti-external-link"></i></a>
+      <span class="disco">scoperto ${daysAgo(f.first_seen)}</span>
+    </div>
+  </div>`;
+}
+function render(){
+  const q=(document.getElementById("q").value||"").toLowerCase().trim();
+  const cat=document.getElementById("cat").value, reg=document.getElementById("reg").value;
+  const sort=document.getElementById("sort").value;
+  let r=DATA.filter(f=>{
+    if(FILT.stato&&f.stato!==FILT.stato)return false;
+    if(cat&&f.category!==cat)return false;
+    if(reg&&f.region!==reg)return false;
+    if(q){const hay=(f.school_name+" "+titolo(f)+" "+ambito(f)+" "+f.region).toLowerCase();
+      if(!hay.includes(q))return false}
+    return true;
+  });
+  r.sort((a,b)=>{
+    if(sort==="conf")return(b.score||0)-(a.score||0);
+    if(sort==="scad"){const av=a.scadenza||"9999",bv=b.scadenza||"9999";return av<bv?-1:av>bv?1:0}
+    return new Date(b.first_seen)-new Date(a.first_seen);
+  });
+  renderStats();
+  document.getElementById("count").innerHTML=`<b>${r.length}</b> band${r.length===1?'o':'i'}`+
+    (FILT.stato?` · stato: ${FILT.stato}`:"");
+  document.getElementById("grid").innerHTML=r.length?r.map(card).join(""):
+    `<div class="empty" style="grid-column:1/-1"><i class="ti ti-mood-empty"></i>Nessun bando con questi filtri</div>`;
+}
+["q","cat","reg","sort"].forEach(id=>document.getElementById(id).addEventListener("input",render));
+
+async function loadLatest(){
+  const bases=["../data/snapshots/","data/snapshots/","./data/snapshots/","/data/snapshots/"];
+  const t=new Date();
+  for(let i=0;i<25;i++){
+    const d=new Date(t);d.setDate(t.getDate()-i);const ds=d.toISOString().slice(0,10);
+    for(const b of bases){
+      try{const res=await fetch(b+"argo-"+ds+".json",{cache:"no-store"});
+        if(res.ok){return{j:await res.json(),date:ds}}}catch(e){}
+    }
+  }
+  return null;
+}
+(async()=>{
+  try{theme(localStorage.bandit_theme||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"))}
+  catch(e){theme("light")}
+  document.getElementById("grid").innerHTML=Array(6).fill('<div class="skel"></div>').join("");
+  const res=await loadLatest();
+  if(!res){document.getElementById("grid").innerHTML=
+    `<div class="empty" style="grid-column:1/-1"><i class="ti ti-database-off"></i>
+     Nessuno snapshot trovato in data/snapshots/. Lancia il crawl.</div>`;return}
+  DATA=(res.j.findings||[]).filter(f=>f.ai_bando!==0);
+  document.getElementById("updated").textContent="aggiornato "+fmtDate(res.date);
+  fillSelects();render();
+})();
+</script>
+</body>
+</html>
