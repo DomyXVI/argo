@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -24,6 +25,23 @@ from argo import anagrafe
 from argo.discovery import discover
 from argo.report import write_discovery_report
 from argo.store import Store
+
+
+def _discover_resilient(code: str, website: str, timeout: float, pause: float,
+                        attempts: int = 4) -> "object":
+    """discover() con retry su fallimento. Col dedup per sito ogni istituto ha UN
+    solo tentativo (prima ne aveva ~6, uno per plesso): un singolo 509/timeout
+    transitorio cancellava l'intero istituto. Verificato che i falliti del run si
+    recuperano in pieno sotto carico normale -> riprovare, spalmando i tentativi
+    nel tempo (backoff), recupera il throttling che si dissolve via via che il
+    grosso del run finisce. Si ferma appena il sito risponde."""
+    d = discover(code, website, timeout, pause)
+    tries = 1
+    while not d.reachable and tries < attempts:
+        time.sleep(2.0 * tries + random.random())   # backoff: 2-3s, 4-5s, 6-7s
+        d = discover(code, website, timeout, pause)
+        tries += 1
+    return d
 
 
 def _site_key(url: str) -> str:
@@ -82,7 +100,7 @@ def main() -> None:
     t0 = time.time()
     done = found = reachable = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(discover, rep.code, rep.website, timeout, pause):
+        futs = {ex.submit(_discover_resilient, rep.code, rep.website, timeout, pause):
                 _site_key(rep.website) for rep in reps}
         for fut in as_completed(futs):
             d = fut.result()

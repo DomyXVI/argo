@@ -168,7 +168,9 @@ _RETRY_CODES = (403, 429, 503, 509)
 # sullo stesso dominio) verrebbero martellate da decine di richieste insieme,
 # scatenando 429/509 e ban WAF. Un semaforo per dominio registrabile limita la
 # concorrenza verso lo STESSO host, lasciando pieni paralleli i domini distinti.
-PER_HOST_CONCURRENCY = 2
+# =1: serializza SOLO le piattaforme condivise (dove nasce il throttling); i
+# domini a singola scuola non hanno contesa, quindi restano veloci come prima.
+PER_HOST_CONCURRENCY = 1
 _host_sems: dict[str, threading.Semaphore] = {}
 _host_sems_lock = threading.Lock()
 
