@@ -70,6 +70,7 @@ def _arricchisci_ai(store: Store, cfg: dict) -> None:
     workers = ai_cfg.get("workers", 4)
     timeout = ai_cfg.get("timeout", 30)
     model = ai_cfg.get("model", "gpt-4o-mini")
+    max_chars = ai_cfg.get("max_doc_chars", 26_000)
     todo = store.findings_needing_ai(limit)
     if not todo:
         return
@@ -78,8 +79,8 @@ def _arricchisci_ai(store: Store, cfg: dict) -> None:
     done = bandi = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(ai_review.rivedi_bando, r["url"], r["title"] or "",
-                          r["category"] or "", model, timeout): r["fingerprint"]
-                for r in todo}
+                          r["category"] or "", model, timeout, max_chars):
+                r["fingerprint"] for r in todo}
         for fut in as_completed(futs):
             fp = futs[fut]
             try:

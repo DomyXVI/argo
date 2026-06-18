@@ -21,9 +21,11 @@ import json
 import os
 import re
 
-# Cap del testo inviato al modello: la scadenza vive nelle prime pagine. Tiene i
-# token (~6-7k) e con essi il costo sotto controllo.
-_MAX_CHARS = 24_000
+# Cap di DEFAULT del testo inviato al modello (sovrascrivibile da config.ai.max_doc_chars).
+# Regola spannometrica per l'italiano col tokenizer GPT: ~3,7 caratteri per token,
+# quindi 26.000 char ~= 7.000 token. NB: non scendere troppo, la scadenza a volte
+# e' in fondo al PDF e un cap basso la taglierebbe (-> "scadenza non indicata").
+_MAX_CHARS = 26_000
 
 _SYSTEM = (
     "Sei un assistente che analizza avvisi pubblicati dalle scuole italiane "
@@ -48,16 +50,18 @@ _SYSTEM = (
 )
 
 
-def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3) -> str:
-    """Testo del documento-bando: HTML visibile + testo dei primi PDF allegati.
-    Riusa il fetch del progetto e `_pdf_text` di scadenza.py. "" se irraggiungibile."""
+def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3,
+                    max_chars: int = _MAX_CHARS) -> str:
+    """Testo del documento-bando: HTML visibile + testo dei primi PDF allegati,
+    troncato a `max_chars` (tetto ai token/costo). Riusa il fetch del progetto e
+    `_pdf_text` di scadenza.py. "" se irraggiungibile."""
     from .fetch import extract_links, fetch_bytes, fetch_with_fallback, visible_text
     from .scadenza import _is_pdf_url, _pdf_text
 
     parti: list[str] = []
     if _is_pdf_url(url):
         ok, _ct, data = fetch_bytes(url, timeout)
-        return (_pdf_text(data)[:_MAX_CHARS]) if ok else ""
+        return (_pdf_text(data)[:max_chars]) if ok else ""
 
     r = fetch_with_fallback(url, timeout)
     if not r.ok:
@@ -69,9 +73,9 @@ def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3) -> str:
         ok, _ct, data = fetch_bytes(pu, timeout)
         if ok:
             parti.append(_pdf_text(data))
-        if sum(len(p) for p in parti) > _MAX_CHARS:
+        if sum(len(p) for p in parti) > max_chars:
             break
-    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(parti)).strip()[:_MAX_CHARS]
+    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(parti)).strip()[:max_chars]
 
 
 def _chiama_openai(system: str, user: str, model: str, timeout: int) -> str | None:
@@ -110,11 +114,12 @@ def disponibile() -> bool:
 
 
 def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
-                 model: str = "gpt-4o-mini", timeout: int = 30) -> dict | None:
-    """Rivede un finding leggendone il documento. Ritorna
+                 model: str = "gpt-4o-mini", timeout: int = 30,
+                 max_chars: int = _MAX_CHARS) -> dict | None:
+    """Rivede un finding leggendone il documento (troncato a `max_chars`). Ritorna
     {is_bando, scadenza, titolo, profilo} oppure None se l'AI non e' disponibile
     o la chiamata fallisce (in tal caso il finding NON va marcato: si ritenta)."""
-    testo = testo_documento(url, timeout=timeout)
+    testo = testo_documento(url, timeout=timeout, max_chars=max_chars)
     if not testo:
         # Nessun testo leggibile: decisione possibile ma povera. Marchiamo come
         # "non determinato" cosi' non si ri-scarica all'infinito un doc vuoto.
