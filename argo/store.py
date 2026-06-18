@@ -72,7 +72,11 @@ CREATE TABLE IF NOT EXISTS findings (
     last_seen    TEXT NOT NULL,
     origin       TEXT DEFAULT 'nuovo',
     scadenza         TEXT,
-    scadenza_checked TEXT
+    scadenza_checked TEXT,
+    ai_checked    TEXT,
+    ai_bando      INTEGER,
+    titolo_pulito TEXT,
+    profilo       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_findings_first  ON findings(first_seen);
 
@@ -119,6 +123,10 @@ class Store:
         if "scadenza_checked" not in fcols:
             self.conn.execute(
                 "ALTER TABLE findings ADD COLUMN scadenza_checked TEXT")
+        for col, decl in (("ai_checked", "TEXT"), ("ai_bando", "INTEGER"),
+                          ("titolo_pulito", "TEXT"), ("profilo", "TEXT")):
+            if col not in fcols:
+                self.conn.execute(f"ALTER TABLE findings ADD COLUMN {col} {decl}")
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_findings_origin ON findings(origin)")
 
@@ -214,6 +222,27 @@ class Store:
         self.conn.execute(
             "UPDATE findings SET scadenza=?, scadenza_checked=? WHERE fingerprint=?",
             (scadenza_iso, _now(), fingerprint),
+        )
+
+    # --- revisione AI (enrichment) ----------------------------------------
+    def findings_needing_ai(self, limit: int = 0) -> list[sqlite3.Row]:
+        """Findings non ancora rivisti dall'AI."""
+        q = ("SELECT fingerprint, url, title, category FROM findings "
+             "WHERE ai_checked IS NULL ORDER BY first_seen DESC")
+        if limit:
+            q += f" LIMIT {int(limit)}"
+        return self.conn.execute(q).fetchall()
+
+    def set_ai_review(self, fingerprint: str, is_bando, scadenza_iso: str | None,
+                      titolo: str, profilo: str) -> None:
+        """Registra l'esito AI e marca ai_checked. La scadenza dell'AI SOSTITUISCE
+        quella a parole-chiave (piu' affidabile, anche quando e' None = non
+        indicata: meglio 'ignota' che la data sbagliata estratta dall'euristica)."""
+        ai_b = None if is_bando is None else (1 if is_bando else 0)
+        self.conn.execute(
+            """UPDATE findings SET ai_bando=?, scadenza=?, titolo_pulito=?,
+               profilo=?, ai_checked=? WHERE fingerprint=?""",
+            (ai_b, scadenza_iso, titolo or None, profilo or None, _now(), fingerprint),
         )
 
     def reset_baseline(self) -> None:

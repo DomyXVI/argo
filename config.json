@@ -39,5 +39,14 @@
     "max_per_run": 0
   },
 
+  "_note_ai": "Revisione AI dei findings sopravvissuti al classificatore (GPT-4o-mini): legge il documento e ricava scadenza affidabile (termine domande, NON data di pubblicazione/fine-progetto), titolo pulito, profilo cercato e conferma se e' davvero un bando aperto. Richiede il secret OPENAI_API_KEY su GitHub Actions; senza chiave il passo si salta e il resto gira. La scadenza AI sostituisce quella a parole-chiave. enabled=false disattiva tutto. max_per_run mette un tetto ai findings per giro: al bootstrap (~546) conviene per spalmare costo/tempo (e' resumable, si completa in piu' run); 0 = tutti.",
+  "ai": {
+    "enabled": true,
+    "model": "gpt-4o-mini",
+    "workers": 6,
+    "timeout": 30,
+    "max_per_run": 250
+  },
+
   "_note_perf": "Benchmark reale su campione stratificato fisso di 599 scuole (seed=42, 10 regioni). Ottimizzazioni P1 (early-exit fallback per host NXDOMAIN/timeout/throttled in fetch.py) + P2 (probe platform-aware + reorder + slash-normalize in discovery.py): a 32 worker/timeout 10s la discovery scende da ~119s a ~70s sul campione (proiezione 29k: 1.6h -> 0.9h) con raggiungibilita' invariata 86.8% e trasparenza 85.0%. A 48 worker scende a ~58s (proiezione ~0.8h) con stesso hit rate: quindi workers alzato 32->48. I domini .gov.it morti danno NXDOMAIN istantaneo (non timeout); P1 salta i fallback inutili sullo stesso dominio morto ma mantiene il salto .gov.it->.edu.it (host diverso). Il crawl giornaliero e' piu' leggero della discovery (niente probe). Tutto entro i limiti di un job GitHub Actions (6h)."
 }

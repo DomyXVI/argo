@@ -4,3 +4,8 @@
 # L'import e' protetto: se pypdf manca, la scadenza resta "ignota" e il resto del
 # crawler funziona comunque.
 pypdf>=4.0
+
+# Revisione AI dei findings (argo/ai_review.py): legge il documento del bando e
+# ricava scadenza affidabile + titolo pulito + conferma-bando via GPT-4o-mini.
+# Import protetto: senza la libreria (o senza OPENAI_API_KEY) il passo si salta.
+openai>=1.0

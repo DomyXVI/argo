@@ -20,6 +20,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from argo.crawl import crawl
+from argo import ai_review
 from argo.scadenza import scadenza_da_url, stato_da_scadenza
 from argo.store import Store
 
@@ -56,6 +57,47 @@ def _arricchisci_scadenze(store: Store, cfg: dict) -> None:
                       f"{time.time()-t0:.0f}s")
     store.commit()
     print(f"Scadenze: {trovate}/{len(todo)} trovate | {time.time()-t0:.0f}s")
+
+
+def _arricchisci_ai(store: Store, cfg: dict) -> None:
+    """Revisione AI dei findings non ancora rivisti: legge il documento e ricava
+    scadenza affidabile + titolo pulito + profilo + conferma-bando. Resumable
+    (marca ai_checked). Salta del tutto se l'AI non e' configurata o senza chiave."""
+    ai_cfg = cfg.get("ai", {})
+    if not ai_cfg.get("enabled", False) or not ai_review.disponibile():
+        return
+    limit = ai_cfg.get("max_per_run", 0)
+    workers = ai_cfg.get("workers", 4)
+    timeout = ai_cfg.get("timeout", 30)
+    model = ai_cfg.get("model", "gpt-4o-mini")
+    todo = store.findings_needing_ai(limit)
+    if not todo:
+        return
+    print(f"Revisione AI: {len(todo)} findings (model {model}, workers {workers})")
+    t0 = time.time()
+    done = bandi = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(ai_review.rivedi_bando, r["url"], r["title"] or "",
+                          r["category"] or "", model, timeout): r["fingerprint"]
+                for r in todo}
+        for fut in as_completed(futs):
+            fp = futs[fut]
+            try:
+                res = fut.result()
+            except Exception:
+                res = None
+            if res is None:
+                continue   # AI non disponibile/errore: non marcare, si ritenta
+            store.set_ai_review(fp, res["is_bando"], res["scadenza"],
+                                res["titolo"], res["profilo"])
+            done += 1
+            bandi += 1 if res.get("is_bando") else 0
+            if done % 50 == 0:
+                store.commit()
+                print(f"  AI {done}/{len(todo)} | confermati {bandi} | "
+                      f"{time.time()-t0:.0f}s")
+    store.commit()
+    print(f"Revisione AI: {done} processati, {bandi} confermati | {time.time()-t0:.0f}s")
 
 
 def main() -> None:
@@ -133,6 +175,8 @@ def main() -> None:
 
     # arricchimento scadenze (HTML-first, fallback PDF) sui findings non ancora visti
     _arricchisci_scadenze(store, cfg)
+    # revisione AI: scadenza affidabile + titolo pulito + conferma-bando (se abilitata)
+    _arricchisci_ai(store, cfg)
 
     # snapshot JSON datato del giro. Lo `stato` (aperto/scaduto/ignota) e'
     # calcolato a runtime da scadenza vs oggi: non va congelato nel DB.
@@ -142,10 +186,16 @@ def main() -> None:
     oggi = date.today()
     findings = []
     stati = {"aperto": 0, "scaduto": 0, "ignota": 0}
+    esclusi_ai = 0
     for r in store.all_findings():
         d = dict(r)
+        if d.get("ai_bando") == 0:
+            esclusi_ai += 1   # l'AI ha stabilito che non e' un bando aperto
+            continue
         scad = date.fromisoformat(d["scadenza"]) if d.get("scadenza") else None
         d["stato"] = stato_da_scadenza(scad, oggi)
+        if d.get("titolo_pulito"):       # titolo leggibile dall'AI, se c'e'
+            d["titolo"] = d["titolo_pulito"]
         stati[d["stato"]] += 1
         findings.append(d)
     snap = snap_dir / f"argo-{stamp}.json"
@@ -154,7 +204,7 @@ def main() -> None:
                  "hit_totali": total_hits, "nuovi_oggi": new_hits,
                  "da_archivio": archived, "nuove_pubblicazioni": new_hits - archived,
                  "aperti": stati["aperto"], "scaduti": stati["scaduto"],
-                 "scadenza_ignota": stati["ignota"]},
+                 "scadenza_ignota": stati["ignota"], "esclusi_ai": esclusi_ai},
         "findings": findings,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 

@@ -55,6 +55,8 @@ jobs:
           fi
 
       - name: Crawl incrementale
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           RESET=""
           if [ "${{ inputs.reset }}" = "true" ]; then RESET="--reset"; fi
