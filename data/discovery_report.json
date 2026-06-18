@@ -1,121 +1,121 @@
 {
   "meta": {
-    "generato": "2026-06-17T10:42:30.364920+00:00",
+    "generato": "2026-06-18T15:07:04.698603+00:00",
     "scuole_totali": 29011,
-    "raggiungibili": 15101,
-    "raggiungibili_pct": 52.1,
-    "trasparenza_trovata": 14467,
-    "trasparenza_pct": 49.9
+    "raggiungibili": 15723,
+    "raggiungibili_pct": 54.2,
+    "trasparenza_trovata": 15006,
+    "trasparenza_pct": 51.7
   },
   "per_regione": {
     "EMILIA ROMAGNA": {
       "totale": 3029,
-      "raggiungibili": 1134,
-      "trasparenza": 1071,
-      "raggiungibili_pct": 37.4,
-      "trasparenza_pct": 35.4
+      "raggiungibili": 1287,
+      "trasparenza": 1209,
+      "raggiungibili_pct": 42.5,
+      "trasparenza_pct": 39.9
     },
     "FRIULI-VENEZIA G.": {
       "totale": 1127,
-      "raggiungibili": 436,
-      "trasparenza": 396,
-      "raggiungibili_pct": 38.7,
-      "trasparenza_pct": 35.1
+      "raggiungibili": 476,
+      "trasparenza": 436,
+      "raggiungibili_pct": 42.2,
+      "trasparenza_pct": 38.7
     },
     "LAZIO": {
       "totale": 4029,
-      "raggiungibili": 2493,
-      "trasparenza": 2346,
-      "raggiungibili_pct": 61.9,
-      "trasparenza_pct": 58.2
+      "raggiungibili": 2422,
+      "trasparenza": 2275,
+      "raggiungibili_pct": 60.1,
+      "trasparenza_pct": 56.5
     },
     "LIGURIA": {
       "totale": 1265,
-      "raggiungibili": 606,
-      "trasparenza": 582,
-      "raggiungibili_pct": 47.9,
-      "trasparenza_pct": 46.0
+      "raggiungibili": 625,
+      "trasparenza": 594,
+      "raggiungibili_pct": 49.4,
+      "trasparenza_pct": 47.0
     },
     "LOMBARDIA": {
       "totale": 6453,
-      "raggiungibili": 3713,
+      "raggiungibili": 3736,
       "trasparenza": 3618,
-      "raggiungibili_pct": 57.5,
+      "raggiungibili_pct": 57.9,
       "trasparenza_pct": 56.1
     },
     "MARCHE": {
       "totale": 1560,
-      "raggiungibili": 441,
-      "trasparenza": 418,
-      "raggiungibili_pct": 28.3,
-      "trasparenza_pct": 26.8
+      "raggiungibili": 595,
+      "trasparenza": 571,
+      "raggiungibili_pct": 38.1,
+      "trasparenza_pct": 36.6
     },
     "PIEMONTE": {
       "totale": 3870,
-      "raggiungibili": 2460,
-      "trasparenza": 2382,
-      "raggiungibili_pct": 63.6,
-      "trasparenza_pct": 61.6
+      "raggiungibili": 2472,
+      "trasparenza": 2380,
+      "raggiungibili_pct": 63.9,
+      "trasparenza_pct": 61.5
     },
     "TOSCANA": {
       "totale": 3226,
-      "raggiungibili": 1935,
-      "trasparenza": 1844,
-      "raggiungibili_pct": 60.0,
-      "trasparenza_pct": 57.2
+      "raggiungibili": 2007,
+      "trasparenza": 1910,
+      "raggiungibili_pct": 62.2,
+      "trasparenza_pct": 59.2
     },
     "UMBRIA": {
       "totale": 962,
-      "raggiungibili": 331,
-      "trasparenza": 321,
-      "raggiungibili_pct": 34.4,
-      "trasparenza_pct": 33.4
+      "raggiungibili": 417,
+      "trasparenza": 398,
+      "raggiungibili_pct": 43.3,
+      "trasparenza_pct": 41.4
     },
     "VENETO": {
       "totale": 3490,
-      "raggiungibili": 1552,
-      "trasparenza": 1489,
-      "raggiungibili_pct": 44.5,
-      "trasparenza_pct": 42.7
+      "raggiungibili": 1686,
+      "trasparenza": 1615,
+      "raggiungibili_pct": 48.3,
+      "trasparenza_pct": 46.3
     }
   },
   "piattaforme": {
-    "agid_wordpress": 9981,
-    "spaggiari": 2038,
-    "generic": 1247,
-    "axios": 652,
-    "wordpress_generic": 501,
-    "argo_software": 342,
-    "madisoft": 340
+    "agid_wordpress": 10541,
+    "spaggiari": 1961,
+    "generic": 1056,
+    "wordpress_generic": 874,
+    "axios": 648,
+    "argo_software": 336,
+    "madisoft": 307
   },
   "esiti_discovery": {
-    "ok": 14467,
-    "URLError timed out": 4480,
-    "URLError [Errno -2] Name or service not known": 4380,
-    "HTTPError 509": 3947,
-    "no_trasparenza_found": 634,
+    "ok": 15006,
+    "URLError [Errno -2] Name or service not known": 4271,
+    "HTTPError 509": 4023,
+    "URLError timed out": 3694,
+    "no_trasparenza_found": 717,
     "no_site_in_csv": 591,
-    "URLError [Errno -3] Temporary failure in name resolution": 140,
-    "HTTPError 404": 119,
-    "HTTPError 403": 59,
-    "HTTPError 500": 51,
-    "URLError [Errno -5] No address associated with hostname": 33,
-    "TimeoutError read timed out": 15,
+    "URLError [Errno -3] Temporary failure in name resolution": 139,
+    "URLError [Errno 101] Network is unreachable": 135,
+    "HTTPError 404": 111,
+    "HTTPError 403": 100,
+    "TimeoutError read timed out": 54,
+    "HTTPError 500": 41,
+    "URLError [Errno -5] No address associated with hostname": 40,
     "URLError [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)": 15,
     "EOFError Compressed file ended before the end-of-stream marker was reached": 13,
-    "URLError [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:1010)": 11,
     "UnicodeError label empty or too long": 10,
     "HTTPError 503": 10,
     "HTTPError 410": 8,
+    "URLError [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:1010)": 7,
     "URLError no host given": 7,
     "URLError [Errno 111] Connection refused": 5,
     "HTTPError 401": 5,
-    "HTTPError 520": 4,
+    "HTTPError 520": 3,
     "HTTPError 429": 2,
     "RemoteDisconnected Remote end closed connection without response": 1,
     "HTTPError 521": 1,
     "URLError [SSL: TLSV1_UNRECOGNIZED_NAME] tlsv1 unrecognized name (_ssl.c:1010)": 1,
-    "URLError [Errno 104] Connection reset by peer": 1,
-    "HTTPError 422": 1
+    "URLError [Errno 104] Connection reset by peer": 1
   }
 }
