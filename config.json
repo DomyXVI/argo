@@ -45,7 +45,7 @@
     "model": "gpt-4o-mini",
     "workers": 6,
     "timeout": 30,
-    "max_per_run": 250,
+    "max_per_run": 400,
     "max_doc_chars": 26000
   },
 
