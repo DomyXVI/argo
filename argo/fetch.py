@@ -340,15 +340,33 @@ def looks_like_html(ct: str, data: bytes) -> bool:
             or head[:1] == b"<" or b"<html" in head or b"<!doctype" in head)
 
 
+def _docx_text(data: bytes) -> str:
+    """Testo da un .docx (zip OOXML con word/document.xml). Solo stdlib
+    (zipfile): niente nuove dipendenze. "" se non e' un docx leggibile."""
+    import io
+    import zipfile
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("word/document.xml").decode("utf-8", "ignore")
+    except Exception:
+        return ""
+    xml = re.sub(r"</w:p>", "\n", xml)          # fine paragrafo -> a capo
+    return re.sub(r"[ \t]+", " ", _TAG_RE.sub(" ", xml)).strip()
+
+
 def bytes_to_text(ct: str, data: bytes, pdf_reader) -> str:
     """Byte di un allegato-bando -> testo. `pdf_reader` e' una callable
     bytes->str (passata da chi possiede pypdf, cosi' fetch.py resta a zero
-    dipendenze). PDF vero -> pdf_reader; HTML -> testo visibile; ignoto ->
-    tenta comunque il PDF (qualche server non mette il magic in testa)."""
+    dipendenze). PDF vero -> pdf_reader; HTML -> testo visibile; .docx (zip) ->
+    estrazione OOXML; ignoto -> tenta comunque il PDF."""
     if data.lstrip()[:5].startswith(b"%PDF"):
         return pdf_reader(data)
     if looks_like_html(ct, data):
         return visible_text(data.decode("utf-8", "ignore"))
+    if data[:4] == b"PK\x03\x04":               # zip -> forse .docx
+        t = _docx_text(data)
+        if t:
+            return t
     return pdf_reader(data)
 
 

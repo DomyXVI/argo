@@ -75,6 +75,11 @@ _DOC_HINT = re.compile(r"/documenti/|/sdg\d|[?&]download|/download|/allegat|"
                        r"/uploads?/|/file/|attachment", re.IGNORECASE)
 _ATITEM_RE = re.compile(r'class="[^"]*at-item[^"]*".*?'
                         r'(?=class="[^"]*at-item|</main|</body|\Z)', re.IGNORECASE | re.DOTALL)
+# Template trasparenza-pa.net: ogni atto e' un link che apre un modal Bootstrap
+# (data-bs-target="#modalDetail-<id>"); i file (download.php) stanno nel
+# <div id="modalDetail-<id>">. Catturiamo (id, testo-del-link) per il matching.
+_TRASP_LINK_RE = re.compile(r'data-bs-target="#modalDetail-(\d+)"[^>]*>(.*?)</a>',
+                            re.IGNORECASE | re.DOTALL)
 _TAG_ONLY = re.compile(r"<[^>]+>")
 
 
@@ -96,28 +101,46 @@ def _is_doc_link(url: str, anchor: str) -> bool:
     return _is_pdf_url(url) or bool(_DOC_HINT.search(url))
 
 
-def _match_atto_block(html: str, titolo_hint: str) -> str:
-    """Su una pagina-INDICE dell'albo (template 'at-item', che lista decine di
-    atti) ritorna l'HTML del SOLO blocco il cui titolo somiglia di piu' a
-    `titolo_hint`. Serve a leggere il documento DELL'ATTO GIUSTO: prendere i
-    link a caso dalla lista leggerebbe la scadenza di un altro bando. "" se la
-    pagina non e' un indice o nessun blocco somiglia abbastanza."""
-    if not titolo_hint:
-        return ""
-    blocks = _ATITEM_RE.findall(html)
-    if len(blocks) < 2:
-        return ""   # non e' una pagina-lista: nessun blocco da isolare
+def _best_by_title(cands: list[tuple[str, str]], titolo_hint: str):
+    """Tra `cands` = [(payload, testo)] ritorna il payload il cui testo somiglia
+    di piu' a `titolo_hint` (ratio + parole in comune), o None se sotto soglia."""
     target = _norm(titolo_hint)
     words = [w for w in target.split() if len(w) > 4]
-    best, best_sc = "", 0.0
-    for b in blocks:
-        txt = _norm(_TAG_ONLY.sub(" ", b))
+    best, best_sc = None, 0.0
+    for payload, testo in cands:
+        txt = _norm(_TAG_ONLY.sub(" ", testo))
         ratio = SequenceMatcher(None, target[:80], txt[:300]).ratio()
         hit = (sum(1 for w in words if w in txt) / len(words)) if words else 0.0
         sc = ratio * 0.4 + hit * 0.6
         if sc > best_sc:
-            best_sc, best = sc, b
-    return best if best_sc >= 0.35 else ""
+            best_sc, best = sc, payload
+    return best if best_sc >= 0.35 else None
+
+
+def _match_atto_block(html: str, titolo_hint: str) -> str:
+    """Su una pagina-INDICE dell'albo ritorna l'HTML del SOLO blocco dell'atto
+    che corrisponde a `titolo_hint`. Serve a leggere il documento DELL'ATTO
+    GIUSTO: prendere i link a caso dalla lista leggerebbe la scadenza di un
+    altro bando. "" se non e' un indice o nessun atto somiglia abbastanza.
+    Gestisce i due template diffusi: Spaggiari/PA-digitale ('at-item') e
+    trasparenza-pa.net (modal Bootstrap 'modalDetail')."""
+    if not titolo_hint:
+        return ""
+    # Template 'at-item': i blocchi sono gia' l'atto completo (titolo + file).
+    blocks = _ATITEM_RE.findall(html)
+    if len(blocks) >= 2:
+        return _best_by_title([(b, b) for b in blocks], titolo_hint) or ""
+    # Template trasparenza-pa: matcho il link-titolo, poi prendo il suo modal
+    # (<div id="modalDetail-<id>">) che contiene i download.php dell'atto.
+    pairs = _TRASP_LINK_RE.findall(html)
+    if len(pairs) >= 2:
+        mid = _best_by_title([(i, t) for i, t in pairs], titolo_hint)
+        if mid:
+            m = re.search(r'id="modalDetail-' + re.escape(mid) +
+                          r'".*?(?=id="modalDetail-|</body|\Z)', html, re.DOTALL)
+            if m:
+                return m.group(0)
+    return ""
 
 
 def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
@@ -130,10 +153,14 @@ def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
     l'URL del finding e' gia' quello giusto. ("","") se irraggiungibile/rumore."""
     from .fetch import (bytes_to_text, extract_links, fetch_bytes,
                         fetch_with_fallback, html_is_noise, visible_text)
-    from .scadenza import _is_pdf_url, _pdf_text
+    from .scadenza import _pdf_text
 
     parti: list[str] = []
-    if _is_pdf_url(url):
+    # URL che e' GIA' un documento (anche senza estensione .pdf: download.php,
+    # /Documenti/<id>...): scaricalo come byte e lascia che bytes_to_text capisca
+    # se e' PDF/HTML/docx. Prima questi cadevano nel ramo HTML -> PDF letto come
+    # spazzatura (es. i trasparenza-pa download.php, che hanno la scadenza dentro).
+    if _is_doc_link(url, ""):
         ok, ct, data = fetch_bytes(url, timeout)
         return ((bytes_to_text(ct, data, _pdf_text)[:max_chars]), "") if ok else ("", "")
 
