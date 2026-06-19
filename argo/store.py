@@ -250,15 +250,15 @@ class Store:
              doc_url or None, _now(), fingerprint),
         )
 
-    def reset_ai_unresolved(self) -> int:
-        """Azzera ai_checked SOLO dei findings senza scadenza che NON sono stati
-        scartati dall'AI: cioe' gli 'ignota' (ai_bando=1, nessun termine trovato)
-        e i 'doc vuoti' (ai_bando IS NULL). Cosi' il prossimo giro li RILEGGE col
-        codice nuovo (documento giusto, link senza .pdf), senza ri-processare i
-        bandi gia' risolti (hanno scadenza) ne' gli esclusi (ai_bando=0)."""
+    def reset_ai_visible(self) -> int:
+        """Azzera ai_checked di TUTTI i findings non scartati dall'AI: bandi
+        (ai_bando=1, aperti/scaduti/ignota) + doc vuoti (ai_bando IS NULL). Il
+        prossimo giro li RILEGGE col codice nuovo -> ripopola scadenza E doc_url
+        (link diretto all'atto) anche sui gia' risolti. Esclude solo i non-bandi
+        (ai_bando=0): restano nascosti, inutile rileggerli e spendere AI."""
         cur = self.conn.execute(
             "UPDATE findings SET ai_checked=NULL "
-            "WHERE scadenza IS NULL AND (ai_bando IS NULL OR ai_bando=1)")
+            "WHERE ai_bando IS NULL OR ai_bando=1")
         self.conn.commit()
         return cur.rowcount
 

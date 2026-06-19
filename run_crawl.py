@@ -107,9 +107,10 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--reset", action="store_true",
                     help="Deploy pulito: svuota findings e first_crawled prima del crawl")
-    ap.add_argument("--reset-ai-unresolved", action="store_true",
-                    help="Azzera ai_checked dei findings senza scadenza non esclusi "
-                         "(ignota + doc vuoti): il prossimo giro li rilegge col codice nuovo")
+    ap.add_argument("--reset-ai", action="store_true",
+                    help="Azzera ai_checked di tutti i findings non esclusi "
+                         "(bandi + doc vuoti): il prossimo giro li rilegge col "
+                         "codice nuovo e ripopola scadenza + doc_url")
     args = ap.parse_args()
 
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
@@ -117,9 +118,9 @@ def main() -> None:
     if args.reset:
         store.reset_baseline()
         print("Baseline azzerata (findings svuotati, first_crawled resettato).")
-    if args.reset_ai_unresolved:
-        n = store.reset_ai_unresolved()
-        print(f"Reset AI mirato: {n} findings (ignota + doc vuoti) verranno riletti.")
+    if args.reset_ai:
+        n = store.reset_ai_visible()
+        print(f"Reset AI: {n} findings non esclusi verranno riletti (scadenza + doc_url).")
     schools = store.schools_with_trasparenza()
     # Dedup per trasparenza_url: i plessi di uno stesso istituto comprensivo
     # condividono la medesima pagina trasparenza. Crawlarla una volta sola taglia
