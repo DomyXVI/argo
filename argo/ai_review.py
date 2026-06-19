@@ -98,7 +98,12 @@ def _chiama_openai(system: str, user: str, model: str, timeout: int) -> str | No
             temperature=0,
         )
         return resp.choices[0].message.content
-    except Exception:
+    except Exception as e:
+        # NON ingoiare l'errore in silenzio: una chiamata fallita deve essere
+        # diagnosticabile dal log (chiave errata, quota, rate limit, modello...).
+        import sys
+        print(f"[ai_review] chiamata LLM fallita: {type(e).__name__}: {e}",
+              file=sys.stderr)
         return None
 
 
