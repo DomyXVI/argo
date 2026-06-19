@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS findings (
     ai_checked    TEXT,
     ai_bando      INTEGER,
     titolo_pulito TEXT,
-    profilo       TEXT
+    profilo       TEXT,
+    doc_url       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_findings_first  ON findings(first_seen);
 
@@ -124,7 +125,8 @@ class Store:
             self.conn.execute(
                 "ALTER TABLE findings ADD COLUMN scadenza_checked TEXT")
         for col, decl in (("ai_checked", "TEXT"), ("ai_bando", "INTEGER"),
-                          ("titolo_pulito", "TEXT"), ("profilo", "TEXT")):
+                          ("titolo_pulito", "TEXT"), ("profilo", "TEXT"),
+                          ("doc_url", "TEXT")):
             if col not in fcols:
                 self.conn.execute(f"ALTER TABLE findings ADD COLUMN {col} {decl}")
         self.conn.execute(
@@ -234,15 +236,18 @@ class Store:
         return self.conn.execute(q).fetchall()
 
     def set_ai_review(self, fingerprint: str, is_bando, scadenza_iso: str | None,
-                      titolo: str, profilo: str) -> None:
+                      titolo: str, profilo: str, doc_url: str | None = None) -> None:
         """Registra l'esito AI e marca ai_checked. La scadenza dell'AI SOSTITUISCE
         quella a parole-chiave (piu' affidabile, anche quando e' None = non
-        indicata: meglio 'ignota' che la data sbagliata estratta dall'euristica)."""
+        indicata: meglio 'ignota' che la data sbagliata estratta dall'euristica).
+        `doc_url` = link diretto all'atto risolto sulle pagine-indice (per il
+        bottone 'Apri bando'); None se l'URL del finding e' gia' quello giusto."""
         ai_b = None if is_bando is None else (1 if is_bando else 0)
         self.conn.execute(
             """UPDATE findings SET ai_bando=?, scadenza=?, titolo_pulito=?,
-               profilo=?, ai_checked=? WHERE fingerprint=?""",
-            (ai_b, scadenza_iso, titolo or None, profilo or None, _now(), fingerprint),
+               profilo=?, doc_url=?, ai_checked=? WHERE fingerprint=?""",
+            (ai_b, scadenza_iso, titolo or None, profilo or None,
+             doc_url or None, _now(), fingerprint),
         )
 
     def reset_ai_unresolved(self) -> int:

@@ -198,7 +198,7 @@ function card(f){
         <span class="bar"><i style="width:${pct}%"></i></span></span>
     </div>
     <div class="foot">
-      <a class="open" href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener">Apri bando <i class="ti ti-external-link"></i></a>
+      <a class="open" href="${esc(safeUrl(f.doc_url||f.url))}" target="_blank" rel="noopener">Apri bando <i class="ti ti-external-link"></i></a>
       <span class="disco" title="scoperto ${daysAgo(f.first_seen)}">scoperto il ${fmtDate(f.first_seen)}</span>
     </div>
   </div>`;

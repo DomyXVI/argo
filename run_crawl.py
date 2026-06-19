@@ -90,7 +90,7 @@ def _arricchisci_ai(store: Store, cfg: dict) -> None:
             if res is None:
                 continue   # AI non disponibile/errore: non marcare, si ritenta
             store.set_ai_review(fp, res["is_bando"], res["scadenza"],
-                                res["titolo"], res["profilo"])
+                                res["titolo"], res["profilo"], res.get("doc_url"))
             done += 1
             bandi += 1 if res.get("is_bando") else 0
             if done % 50 == 0:

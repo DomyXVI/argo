@@ -115,11 +115,13 @@ def _match_atto_block(html: str, titolo_hint: str) -> str:
 
 
 def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
-                    max_pdf: int = 3, max_chars: int = _MAX_CHARS) -> str:
-    """Testo del documento-bando: testo dell'atto + dei suoi documenti allegati,
-    troncato a `max_chars` (tetto ai token/costo). Se l'URL e' la pagina-indice
-    dell'albo, isola il blocco dell'atto che corrisponde a `titolo_hint` e legge
-    SOLO i suoi documenti. "" se irraggiungibile o se e' solo rumore (login)."""
+                    max_pdf: int = 3, max_chars: int = _MAX_CHARS) -> tuple[str, str]:
+    """Ritorna (testo, doc_url). `testo` = atto + suoi documenti allegati,
+    troncato a `max_chars`. Se l'URL e' la pagina-indice dell'albo, isola il
+    blocco dell'atto che corrisponde a `titolo_hint` e legge SOLO i suoi
+    documenti; `doc_url` e' allora il link DIRETTO all'atto (per il bottone
+    'Apri bando' del portale, altrimenti si atterra sull'indice). `doc_url` ="" se
+    l'URL del finding e' gia' quello giusto. ("","") se irraggiungibile/rumore."""
     from .fetch import (bytes_to_text, extract_links, fetch_bytes,
                         fetch_with_fallback, html_is_noise, visible_text)
     from .scadenza import _is_pdf_url, _pdf_text
@@ -127,11 +129,11 @@ def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
     parti: list[str] = []
     if _is_pdf_url(url):
         ok, ct, data = fetch_bytes(url, timeout)
-        return (bytes_to_text(ct, data, _pdf_text)[:max_chars]) if ok else ""
+        return ((bytes_to_text(ct, data, _pdf_text)[:max_chars]), "") if ok else ("", "")
 
     r = fetch_with_fallback(url, timeout)
     if not r.ok:
-        return ""
+        return ("", "")
     base = r.final_url or url
     # Pagina-indice? Isola il blocco del nostro atto: la sua parte di testo e i
     # suoi documenti, non l'intera lista (rumore + scadenze di altri bandi).
@@ -145,13 +147,17 @@ def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
             parti.append(html_txt)
         scope = r.html
     links = [(u, t) for u, t in extract_links(scope, base) if _is_doc_link(u, t)]
-    for du in _rank_docs(links)[:max_pdf]:
+    ranked = _rank_docs(links)
+    # Solo se abbiamo isolato il blocco (pagina-indice): il 1o documento e' l'atto
+    # nostro -> link diretto per il portale. Su pagina gia' giusta non si tocca.
+    doc_url = ranked[0] if (block and ranked) else ""
+    for du in ranked[:max_pdf]:
         ok, ct, data = fetch_bytes(du, timeout)
         if ok:
             parti.append(bytes_to_text(ct, data, _pdf_text))
         if sum(len(p) for p in parti) > max_chars:
             break
-    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(parti)).strip()[:max_chars]
+    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(parti)).strip()[:max_chars], doc_url
 
 
 def _chiama_openai(system: str, user: str, model: str, timeout: int) -> str | None:
@@ -198,14 +204,15 @@ def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
                  model: str = "gpt-4o-mini", timeout: int = 30,
                  max_chars: int = _MAX_CHARS) -> dict | None:
     """Rivede un finding leggendone il documento (troncato a `max_chars`). Ritorna
-    {is_bando, scadenza, titolo, profilo} oppure None se l'AI non e' disponibile
-    o la chiamata fallisce (in tal caso il finding NON va marcato: si ritenta)."""
-    testo = testo_documento(url, titolo_hint=titolo_hint, timeout=timeout,
-                            max_chars=max_chars)
+    {is_bando, scadenza, titolo, profilo, doc_url} oppure None se l'AI non e'
+    disponibile o la chiamata fallisce (il finding NON va marcato: si ritenta)."""
+    testo, doc_url = testo_documento(url, titolo_hint=titolo_hint, timeout=timeout,
+                                     max_chars=max_chars)
     if not testo:
         # Nessun testo leggibile: decisione possibile ma povera. Marchiamo come
         # "non determinato" cosi' non si ri-scarica all'infinito un doc vuoto.
-        return {"is_bando": None, "scadenza": None, "titolo": "", "profilo": ""}
+        return {"is_bando": None, "scadenza": None, "titolo": "", "profilo": "",
+                "doc_url": ""}
 
     user = f"Oggetto (grezzo): {titolo_hint}\nCategoria ipotizzata: {categoria_hint}\n\nTESTO:\n{testo}"
     raw = _chiama_openai(_SYSTEM, user, model, timeout)
@@ -234,4 +241,5 @@ def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
         "scadenza": scad,
         "titolo": (data.get("titolo") or "").strip()[:160],
         "profilo": (data.get("profilo") or "").strip()[:60],
+        "doc_url": doc_url,
     }
