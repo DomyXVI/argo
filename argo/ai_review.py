@@ -89,7 +89,7 @@ def _chiama_openai(system: str, user: str, model: str, timeout: int) -> str | No
     except ImportError:
         return None
     try:
-        client = OpenAI(api_key=key, timeout=timeout)
+        client = OpenAI(api_key=key, timeout=timeout, max_retries=5)
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": system},
