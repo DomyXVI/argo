@@ -245,6 +245,18 @@ class Store:
             (ai_b, scadenza_iso, titolo or None, profilo or None, _now(), fingerprint),
         )
 
+    def reset_ai_unresolved(self) -> int:
+        """Azzera ai_checked SOLO dei findings senza scadenza che NON sono stati
+        scartati dall'AI: cioe' gli 'ignota' (ai_bando=1, nessun termine trovato)
+        e i 'doc vuoti' (ai_bando IS NULL). Cosi' il prossimo giro li RILEGGE col
+        codice nuovo (documento giusto, link senza .pdf), senza ri-processare i
+        bandi gia' risolti (hanno scadenza) ne' gli esclusi (ai_bando=0)."""
+        cur = self.conn.execute(
+            "UPDATE findings SET ai_checked=NULL "
+            "WHERE scadenza IS NULL AND (ai_bando IS NULL OR ai_bando=1)")
+        self.conn.commit()
+        return cur.rowcount
+
     def reset_baseline(self) -> None:
         """Deploy pulito: svuota i findings e azzera first_crawled. Il prossimo
         crawl ricostruisce da zero con fingerprint nuovi e origin corretti

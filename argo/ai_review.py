@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from difflib import SequenceMatcher
 
 # Cap di DEFAULT del testo inviato al modello (sovrascrivibile da config.ai.max_doc_chars).
 # Regola spannometrica per l'italiano col tokenizer GPT: ~3,7 caratteri per token,
@@ -35,8 +36,14 @@ _SYSTEM = (
     '- "is_bando" (bool): true SOLO se e\' un avviso/bando APERTO per la selezione '
     "di un ESPERTO o figura ESTERNA (docente esperto, tutor, madrelingua, psicologo, "
     "RSPP, progettista/collaudatore...) a cui ci si puo\' candidare. false se e\' un "
-    "atto gia\' chiuso (graduatoria, nomina, contratto firmato, determina di "
-    "aggiudicazione, verbale, esito), un modulo/allegato, un regolamento, o non pertinente.\n"
+    "atto gia\' PERFEZIONATO o a valle della selezione: graduatoria, nomina, "
+    "contratto (anche 'a titolo gratuito' o 'di prestazione d'opera' gia\' "
+    "stipulato), conferimento/affidamento di incarico gia\' disposto, determina "
+    "di aggiudicazione/a contrarre, avviso di aggiudicazione, verbale, esito; "
+    "oppure un modulo/allegato, un regolamento, o non pertinente. Nel dubbio tra "
+    "un AVVISO che apre le candidature e un ATTO che le chiude, guarda se c'e\' un "
+    "termine per presentare domanda: se manca ed e\' gia\' indicato un beneficiario, "
+    "e\' chiuso (false).\n"
     '- "scadenza" (string|null): la data del TERMINE ULTIMO per presentare la domanda, '
     "in formato YYYY-MM-DD. E\' la data entro cui i candidati devono far pervenire la "
     "domanda. NON e\' la data di pubblicazione, NON e\' la data di protocollo, NON e\' la "
@@ -50,26 +57,69 @@ _SYSTEM = (
 )
 
 
-# Priorita' dei PDF allegati: vogliamo IL bando, non moduli/domanda/cv/privacy.
+# Priorita' degli allegati: vogliamo IL bando, non moduli/domanda/cv/privacy.
 _PDF_PRIO = re.compile(r"avvis|band|selezion|decret|determin|incaric|reclutam", re.IGNORECASE)
 _PDF_SKIP = re.compile(r"modul|domand|allegat|\bcv\b|privacy|informativa|liberatoria", re.IGNORECASE)
+# Link a un documento scaricabile ANCHE senza estensione .pdf: sui portali
+# scolastici (Spaggiari/PA digitale) il decreto sta a `.../Documenti/<id>` o
+# `?download=1`, che il vecchio filtro `_is_pdf_url` scartava -> non leggevamo
+# mai il documento, solo l'indice (che ha la data di pubblicazione, non la
+# scadenza). bytes_to_text capisce poi da solo se e' PDF o HTML.
+_DOC_HINT = re.compile(r"/documenti/|/sdg\d|[?&]download|/download|/allegat|"
+                       r"/uploads?/|/file/|attachment", re.IGNORECASE)
+_ATITEM_RE = re.compile(r'class="[^"]*at-item[^"]*".*?'
+                        r'(?=class="[^"]*at-item|</main|</body|\Z)', re.IGNORECASE | re.DOTALL)
+_TAG_ONLY = re.compile(r"<[^>]+>")
 
 
-def _rank_pdfs(links: list[tuple[str, str]]) -> list[str]:
-    """Ordina (url, anchor) mettendo in cima il PDF che PROBABILMENTE e' il
-    bando e in fondo moduli/domande/cv, cosi' i primi `max_pdf` letti sono i
+def _norm(s: str) -> str:
+    return re.sub(r"\W+", " ", (s or "").lower()).strip()
+
+
+def _rank_docs(links: list[tuple[str, str]]) -> list[str]:
+    """Ordina (url, anchor) mettendo in cima il documento che PROBABILMENTE e'
+    il bando e in fondo moduli/domande/cv, cosi' i primi `max_pdf` letti sono i
     piu' utili (collegato alla roadmap: 'selezione PDF migliore')."""
     def score(testo: str) -> int:
         return (1 if _PDF_PRIO.search(testo) else 0) - (1 if _PDF_SKIP.search(testo) else 0)
     return [u for u, _t in sorted(links, key=lambda x: -score(x[1]))]
 
 
-def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3,
-                    max_chars: int = _MAX_CHARS) -> str:
-    """Testo del documento-bando: HTML visibile + testo dei primi PDF allegati,
-    troncato a `max_chars` (tetto ai token/costo). Riusa il fetch del progetto e
-    `_pdf_text` di scadenza.py. "" se irraggiungibile o se l'HTML e' solo
-    rumore (login SPID / pagina d'errore) senza PDF utili."""
+def _is_doc_link(url: str, anchor: str) -> bool:
+    from .scadenza import _is_pdf_url
+    return _is_pdf_url(url) or bool(_DOC_HINT.search(url))
+
+
+def _match_atto_block(html: str, titolo_hint: str) -> str:
+    """Su una pagina-INDICE dell'albo (template 'at-item', che lista decine di
+    atti) ritorna l'HTML del SOLO blocco il cui titolo somiglia di piu' a
+    `titolo_hint`. Serve a leggere il documento DELL'ATTO GIUSTO: prendere i
+    link a caso dalla lista leggerebbe la scadenza di un altro bando. "" se la
+    pagina non e' un indice o nessun blocco somiglia abbastanza."""
+    if not titolo_hint:
+        return ""
+    blocks = _ATITEM_RE.findall(html)
+    if len(blocks) < 2:
+        return ""   # non e' una pagina-lista: nessun blocco da isolare
+    target = _norm(titolo_hint)
+    words = [w for w in target.split() if len(w) > 4]
+    best, best_sc = "", 0.0
+    for b in blocks:
+        txt = _norm(_TAG_ONLY.sub(" ", b))
+        ratio = SequenceMatcher(None, target[:80], txt[:300]).ratio()
+        hit = (sum(1 for w in words if w in txt) / len(words)) if words else 0.0
+        sc = ratio * 0.4 + hit * 0.6
+        if sc > best_sc:
+            best_sc, best = sc, b
+    return best if best_sc >= 0.35 else ""
+
+
+def testo_documento(url: str, titolo_hint: str = "", timeout: int = 12,
+                    max_pdf: int = 3, max_chars: int = _MAX_CHARS) -> str:
+    """Testo del documento-bando: testo dell'atto + dei suoi documenti allegati,
+    troncato a `max_chars` (tetto ai token/costo). Se l'URL e' la pagina-indice
+    dell'albo, isola il blocco dell'atto che corrisponde a `titolo_hint` e legge
+    SOLO i suoi documenti. "" se irraggiungibile o se e' solo rumore (login)."""
     from .fetch import (bytes_to_text, extract_links, fetch_bytes,
                         fetch_with_fallback, html_is_noise, visible_text)
     from .scadenza import _is_pdf_url, _pdf_text
@@ -82,15 +132,21 @@ def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3,
     r = fetch_with_fallback(url, timeout)
     if not r.ok:
         return ""
-    # La parte HTML entra solo se NON e' rumore (login/errore/vuota): cosi' non
-    # mandiamo all'AI testo inutile, ma teniamo comunque gli eventuali PDF.
-    html_txt = visible_text(r.html)
-    if not html_is_noise(html_txt):
-        parti.append(html_txt)
     base = r.final_url or url
-    links = [(u, t) for u, t in extract_links(r.html, base) if _is_pdf_url(u)]
-    for pu in _rank_pdfs(links)[:max_pdf]:
-        ok, ct, data = fetch_bytes(pu, timeout)
+    # Pagina-indice? Isola il blocco del nostro atto: la sua parte di testo e i
+    # suoi documenti, non l'intera lista (rumore + scadenze di altri bandi).
+    block = _match_atto_block(r.html, titolo_hint)
+    if block:
+        parti.append(visible_text(block))
+        scope = block
+    else:
+        html_txt = visible_text(r.html)
+        if not html_is_noise(html_txt):   # niente login/errore all'AI
+            parti.append(html_txt)
+        scope = r.html
+    links = [(u, t) for u, t in extract_links(scope, base) if _is_doc_link(u, t)]
+    for du in _rank_docs(links)[:max_pdf]:
+        ok, ct, data = fetch_bytes(du, timeout)
         if ok:
             parti.append(bytes_to_text(ct, data, _pdf_text))
         if sum(len(p) for p in parti) > max_chars:
@@ -144,7 +200,8 @@ def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
     """Rivede un finding leggendone il documento (troncato a `max_chars`). Ritorna
     {is_bando, scadenza, titolo, profilo} oppure None se l'AI non e' disponibile
     o la chiamata fallisce (in tal caso il finding NON va marcato: si ritenta)."""
-    testo = testo_documento(url, timeout=timeout, max_chars=max_chars)
+    testo = testo_documento(url, titolo_hint=titolo_hint, timeout=timeout,
+                            max_chars=max_chars)
     if not testo:
         # Nessun testo leggibile: decisione possibile ma povera. Marchiamo come
         # "non determinato" cosi' non si ri-scarica all'infinito un doc vuoto.

@@ -13,6 +13,10 @@ on:
         description: "Deploy pulito: azzera findings + first_crawled (una tantum dopo un cambio di schema/fingerprint)"
         type: boolean
         default: false
+      reset_ai:
+        description: "Rileggi 'ignota' + doc vuoti col codice nuovo (azzera solo il loro ai_checked, non i findings)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -60,6 +64,7 @@ jobs:
         run: |
           RESET=""
           if [ "${{ inputs.reset }}" = "true" ]; then RESET="--reset"; fi
+          if [ "${{ inputs.reset_ai }}" = "true" ]; then RESET="$RESET --reset-ai-unresolved"; fi
           python3 run_crawl.py --config config.json $RESET
 
       - name: Commit risultati (snapshot bandi + report discovery)
