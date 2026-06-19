@@ -5,3 +5,7 @@ data/scuole_statali.csv
 __pycache__/
 *.pyc
 .DS_Store
+
+# Metriche per il capo: MAI versionarle. E config locale dell'editor.
+docs/
+.claude/
