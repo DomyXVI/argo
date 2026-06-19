@@ -48,7 +48,13 @@ _SYSTEM = (
     "in formato YYYY-MM-DD. E\' la data entro cui i candidati devono far pervenire la "
     "domanda. NON e\' la data di pubblicazione, NON e\' la data di protocollo, NON e\' la "
     "data di fine attivita\'/progetto (es. 'le attivita\' dovranno concludersi entro il "
-    "30/06/2026' NON e\' la scadenza). Se il termine domande non e\' indicato chiaramente, "
+    "30/06/2026' NON e\' la scadenza). ATTENZIONE alle pagine-indice dell'albo: "
+    "elencano per ogni atto una data di pubblicazione/protocollo o una finestra "
+    "inizio-fine pubblicazione (es. '15/06/2026 22/06/2026'): NON sono la scadenza. "
+    "La scadenza e' SOLO un termine esplicito per i candidati ('entro e non oltre', "
+    "'far pervenire la domanda entro', 'a pena di esclusione entro le ore...'). Se "
+    "vedi solo date di pubblicazione/protocollo/finestra-albo, metti null. "
+    "Se il termine domande non e\' indicato chiaramente, "
     "metti null: non inventare. Se manca l'anno, deducilo dal resto del documento.\n"
     '- "titolo" (string): un titolo pulito di UNA riga (figura cercata + progetto/ambito), '
     "max ~100 caratteri, senza frammenti di menu o HTML.\n"
@@ -236,6 +242,14 @@ def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
     # doc_vuoti. Cosi' ai_bando=NULL resta riservato al solo vero doc-vuoto e
     # un finding leggibile non viene mai nascosto silenziosamente.
     ib = data.get("is_bando")
+    if scad is None and ib:
+        # L'AI non ha trovato il termine ma dice che e' un bando: ultimo tentativo
+        # con la regex SULLO STESSO testo gia' letto dall'AI (non sull'indice
+        # grezzo), dove "data piu' tardiva" e' molto meno rumorosa. Zero chiamate.
+        from .scadenza import estrai_scadenza
+        d = estrai_scadenza(testo)
+        if d:
+            scad = d.isoformat()
     return {
         "is_bando": False if ib is None else ib,
         "scadenza": scad,

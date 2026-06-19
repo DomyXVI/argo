@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from urllib.parse import urlparse
+from urllib.parse import urldefrag, urlparse
 
 from .classifier import classify
 from .fetch import extract_links, fetch_with_fallback, visible_text
@@ -70,6 +70,22 @@ def _same_site(a: str, b: str) -> bool:
 def _looks_like_listing(text: str, href: str) -> bool:
     blob = f"{text} {href}".lower()
     return any(k in blob for k in LISTING_HINTS)
+
+
+# Ranking dei candidati drill: preferiamo i link il cui PATH e' una vera sezione
+# bandi/albo, e penalizziamo voci-menu rumorose. Cosi' i pochi slot `max_subpages`
+# vanno alle liste giuste, non a link generici.
+_LISTING_PRIO = re.compile(r"albo|band[oi]|avvis|concors|gare|contratt|selezion|incaric|esperti", re.I)
+_LISTING_NOISE = re.compile(r"titolari di incaric|premi e concors", re.I)
+
+
+def _listing_rank(href: str, text: str) -> int:
+    s = 0
+    if _LISTING_PRIO.search(urlparse(href).path):
+        s += 2
+    if _LISTING_NOISE.search(text):
+        s -= 2
+    return s
 
 
 def _best_snippet(body: str) -> str:
@@ -127,18 +143,24 @@ def crawl(code: str, trasparenza_url: str, threshold: float = 0.45,
     pages = 1
     _scan_page(entry.html, entry_url, threshold, hits)
 
-    # drill-down: link-sezione verso liste bandi, stesso dominio, deduplicati
-    seen = {entry_url.rstrip("/")}
-    drill: list[str] = []
+    # drill-down: link-sezione verso liste bandi, stesso dominio, deduplicati.
+    # NB: si confronta il base-url SENZA #frammento. Gli skip-link di
+    # accessibilita' AGID ("Vai ai contenuti" -> .../albo-online/#main) hanno
+    # l'href della pagina stessa col solo #ancora e prima sprecavano TUTTI gli
+    # slot senza mai raggiungere l'albo vero. Tra i candidati prendiamo i
+    # `max_subpages` col path piu' promettente (non i primi in ordine di pagina).
+    entry_key = urldefrag(entry_url)[0].rstrip("/")
+    seen = {entry_key}
+    cands: list[tuple[int, str]] = []
     for href, text in extract_links(entry.html, entry_url):
-        key = href.rstrip("/")
-        if key in seen or not _same_site(href, entry_url):
+        base = urldefrag(href)[0]
+        key = base.rstrip("/")
+        if key in seen or not _same_site(base, entry_url):
             continue
         if _looks_like_listing(text, href):
             seen.add(key)
-            drill.append(href)
-        if len(drill) >= max_subpages:
-            break
+            cands.append((_listing_rank(base, text), base))
+    drill = [b for _s, b in sorted(cands, key=lambda c: -c[0])[:max_subpages]]
 
     for url in drill:
         sub = fetch_with_fallback(url, timeout=max(6, timeout - 2))
