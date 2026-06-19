@@ -106,11 +106,12 @@ def _is_pdf_url(url: str) -> bool:
 def scadenza_da_url(url: str, timeout: int = 10, max_pdf: int = 3) -> date | None:
     """Scadenza per un URL-bando. HTML-first, poi i primi `max_pdf` PDF allegati.
     Non solleva mai: in caso di problemi ritorna None (scadenza ignota)."""
-    from .fetch import extract_links, fetch_bytes, fetch_with_fallback, visible_text
+    from .fetch import (bytes_to_text, extract_links, fetch_bytes,
+                        fetch_with_fallback, visible_text)
 
     if _is_pdf_url(url):
-        ok, _ct, data = fetch_bytes(url, timeout)
-        return estrai_scadenza(_pdf_text(data)) if ok else None
+        ok, ct, data = fetch_bytes(url, timeout)
+        return estrai_scadenza(bytes_to_text(ct, data, _pdf_text)) if ok else None
 
     r = fetch_with_fallback(url, timeout)
     if not r.ok:
@@ -121,9 +122,9 @@ def scadenza_da_url(url: str, timeout: int = 10, max_pdf: int = 3) -> date | Non
     base = r.final_url or url
     pdfs = [u for u, _t in extract_links(r.html, base) if _is_pdf_url(u)]
     for pu in pdfs[:max_pdf]:
-        ok, _ct, data = fetch_bytes(pu, timeout)
+        ok, ct, data = fetch_bytes(pu, timeout)
         if ok:
-            found = estrai_scadenza(_pdf_text(data))
+            found = estrai_scadenza(bytes_to_text(ct, data, _pdf_text))
             if found:
                 return found
     return None

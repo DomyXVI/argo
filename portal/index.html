@@ -108,17 +108,18 @@ footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:
   <span class="tag">bandi per esperti esterni · scuole italiane</span>
   <span class="spacer"></span>
   <span class="updated" id="updated"></span>
-  <button class="iconbtn" id="theme" aria-label="Cambia tema"><i class="ti ti-moon"></i></button>
+  <button class="iconbtn" id="theme" aria-label="Cambia tema" aria-pressed="false"><i class="ti ti-moon"></i></button>
 </div></header>
 
 <main class="wrap">
   <div class="stats" id="stats"></div>
   <div class="filters">
     <div class="search"><i class="ti ti-search"></i>
-      <input id="q" placeholder="Cerca per scuola, titolo, profilo…" autocomplete="off"></div>
-    <select id="cat"><option value="">Tutte le categorie</option></select>
-    <select id="reg"><option value="">Tutte le regioni</option></select>
-    <select id="sort">
+      <input id="q" placeholder="Cerca per scuola, titolo, profilo…" autocomplete="off"
+        aria-label="Cerca per scuola, titolo o profilo"></div>
+    <select id="cat" aria-label="Filtra per categoria"><option value="">Tutte le categorie</option></select>
+    <select id="reg" aria-label="Filtra per regione"><option value="">Tutte le regioni</option></select>
+    <select id="sort" aria-label="Ordina i risultati">
       <option value="recent">Più recenti</option>
       <option value="scad">Scadenza più vicina</option>
       <option value="conf">Confidence più alta</option>
@@ -135,7 +136,14 @@ const CATLAB={generico:"Generico",madrelingua:"Madrelingua",psicologo:"Psicologo
   robotica:"Robotica",digitale:"Digitale",sicurezza:"Sicurezza / RSPP",formazione:"Formazione",
   dm219:"DM 219",pon_progettista_collaudatore:"PON progettista/collaudatore"};
 const STATO_ORDER={aperto:0,ignota:1,scaduto:2};
-let DATA=[], FILT={stato:"aperto"};
+let DATA=[], FILT={stato:""};
+
+// I findings vengono da scraping di siti terzi: mai interpolare grezzo in
+// innerHTML (apostrofi/< rompono la card, rischio XSS). esc() neutralizza il
+// testo; safeUrl() ammette solo http(s) per gli href.
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>(
+  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"#";
 
 function fmtDate(s){if(!s)return"—";const d=new Date(s);return isNaN(d)?"—":
   d.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"})}
@@ -146,6 +154,7 @@ function titolo(f){return f.titolo_pulito||(f.title||"").replace(/\s+/g," ").tri
 
 function theme(t){document.documentElement.dataset.theme=t;
   document.querySelector("#theme i").className="ti ti-"+(t==="dark"?"sun":"moon");
+  document.getElementById("theme").setAttribute("aria-pressed",t==="dark");
   try{localStorage.bandit_theme=t}catch(e){}}
 document.getElementById("theme").onclick=()=>theme(document.documentElement.dataset.theme==="dark"?"light":"dark");
 
@@ -154,38 +163,43 @@ function renderStats(){
   const cards=[["",DATA.length,"Totale",null],["aperto",c.aperto,"Aperti","var(--green)"],
     ["scaduto",c.scaduto,"Scaduti","var(--red)"],["ignota",c.ignota,"Scadenza ignota","var(--amber)"]];
   document.getElementById("stats").innerHTML=cards.map(([s,n,l,col])=>
-    `<div class="stat ${FILT.stato===s?'on':''}" data-s="${s}"><div class="n">${n}</div>
-     <div class="l">${l}</div>${col?`<span class="dot" style="background:${col}"></span>`:""}</div>`).join("");
-  document.querySelectorAll(".stat").forEach(el=>el.onclick=()=>{FILT.stato=el.dataset.s;render()});
+    `<div class="stat ${FILT.stato===s?'on':''}" data-s="${s}" role="button" tabindex="0"
+       aria-pressed="${FILT.stato===s}" aria-label="Filtra: ${esc(l)} (${n})"><div class="n">${n}</div>
+     <div class="l">${esc(l)}</div>${col?`<span class="dot" style="background:${col}"></span>`:""}</div>`).join("");
+  document.querySelectorAll(".stat").forEach(el=>{
+    const go=()=>{FILT.stato=el.dataset.s;render()};
+    el.onclick=go;
+    el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}};
+  });
 }
 function fillSelects(){
   const cats=[...new Set(DATA.map(f=>f.category))].sort();
   document.getElementById("cat").innerHTML='<option value="">Tutte le categorie</option>'+
-    cats.map(c=>`<option value="${c}">${CATLAB[c]||c}</option>`).join("");
+    cats.map(c=>`<option value="${esc(c)}">${esc(CATLAB[c]||c)}</option>`).join("");
   const regs=[...new Set(DATA.map(f=>f.region))].sort();
   document.getElementById("reg").innerHTML='<option value="">Tutte le regioni</option>'+
-    regs.map(r=>`<option value="${r}">${r.charAt(0)+r.slice(1).toLowerCase()}</option>`).join("");
+    regs.map(r=>`<option value="${esc(r)}">${esc(r.toLowerCase().replace(/\b\w/g,m=>m.toUpperCase()))}</option>`).join("");
 }
 function card(f){
   const pct=Math.round((f.score||0)*100);
   const isNew=f.origin==="nuovo";
   return `<div class="card">
     <div class="ctop">
-      <span class="pill p-${f.stato}"><span class="d" style="background:currentColor"></span>${f.stato}</span>
+      <span class="pill p-${esc(f.stato)}"><span class="d" style="background:currentColor"></span>${esc(f.stato)}</span>
       ${isNew?'<span class="new">nuovo</span>':''}
     </div>
-    <div class="title">${titolo(f)}</div>
-    <div class="school"><i class="ti ti-school"></i>${f.school_name} · ${(f.province||"").toLowerCase().replace(/\b\w/g,m=>m.toUpperCase())}</div>
-    <div class="tags"><span class="tag2">${ambito(f)}</span>
-      ${f.profilo?`<span class="tag2 cat">${CATLAB[f.category]||f.category}</span>`:''}</div>
+    <div class="title">${esc(titolo(f))}</div>
+    <div class="school"><i class="ti ti-school"></i>${esc(f.school_name)} · ${esc((f.province||"").toLowerCase().replace(/\b\w/g,m=>m.toUpperCase()))}</div>
+    <div class="tags"><span class="tag2">${esc(ambito(f))}</span>
+      ${f.profilo?`<span class="tag2 cat">${esc(CATLAB[f.category]||f.category)}</span>`:''}</div>
     <div class="meta">
       <span class="scad"><i class="ti ti-calendar-event"></i>${f.scadenza?("scade "+fmtDate(f.scadenza)):"scadenza ignota"}</span>
       <span class="conf"><span class="lab"><span>confidence</span><span>${pct}%</span></span>
         <span class="bar"><i style="width:${pct}%"></i></span></span>
     </div>
     <div class="foot">
-      <a class="open" href="${f.url}" target="_blank" rel="noopener">Apri bando <i class="ti ti-external-link"></i></a>
-      <span class="disco">scoperto ${daysAgo(f.first_seen)}</span>
+      <a class="open" href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener">Apri bando <i class="ti ti-external-link"></i></a>
+      <span class="disco" title="scoperto ${daysAgo(f.first_seen)}">scoperto il ${fmtDate(f.first_seen)}</span>
     </div>
   </div>`;
 }
@@ -234,7 +248,11 @@ async function loadLatest(){
   if(!res){document.getElementById("grid").innerHTML=
     `<div class="empty" style="grid-column:1/-1"><i class="ti ti-database-off"></i>
      Nessuno snapshot trovato in data/snapshots/. Lancia il crawl.</div>`;return}
-  DATA=(res.j.findings||[]).filter(f=>f.ai_bando!==0);
+  // Escludi: 1) ai_bando==0 (l'AI dice "non e' un bando"); 2) doc vuoti/illeggibili
+  // (AI girata -> ai_checked valorizzato, ma nessun verdetto -> ai_bando null).
+  // NB: i finding non ancora visti dall'AI hanno ai_checked null e restano.
+  DATA=(res.j.findings||[]).filter(f=>
+    f.ai_bando!==0 && !(f.ai_checked && (f.ai_bando===null||f.ai_bando===undefined)));
   document.getElementById("updated").textContent="aggiornato "+fmtDate(res.date);
   fillSelects();render();
 })();

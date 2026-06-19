@@ -188,10 +188,18 @@ def main() -> None:
     findings = []
     stati = {"aperto": 0, "scaduto": 0, "ignota": 0}
     esclusi_ai = 0
+    doc_vuoti = 0
     for r in store.all_findings():
         d = dict(r)
         if d.get("ai_bando") == 0:
             esclusi_ai += 1   # l'AI ha stabilito che non e' un bando aperto
+            continue
+        if d.get("ai_checked") and d.get("ai_bando") is None:
+            # L'AI ha girato ma il documento era vuoto/illeggibile (PDF servito
+            # come HTML, pagina dietro login): nessun verdetto. Fuori dai conteggi,
+            # non e' un finding utile. Resta nel DB (recuperabile se miglioriamo
+            # l'estrazione del testo), solo non finisce nello snapshot.
+            doc_vuoti += 1
             continue
         scad = date.fromisoformat(d["scadenza"]) if d.get("scadenza") else None
         d["stato"] = stato_da_scadenza(scad, oggi)
@@ -205,7 +213,8 @@ def main() -> None:
                  "hit_totali": total_hits, "nuovi_oggi": new_hits,
                  "da_archivio": archived, "nuove_pubblicazioni": new_hits - archived,
                  "aperti": stati["aperto"], "scaduti": stati["scaduto"],
-                 "scadenza_ignota": stati["ignota"], "esclusi_ai": esclusi_ai},
+                 "scadenza_ignota": stati["ignota"], "esclusi_ai": esclusi_ai,
+                 "doc_vuoti": doc_vuoti},
         "findings": findings,
     }, indent=2, ensure_ascii=False), encoding="utf-8")
 

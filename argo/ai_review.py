@@ -50,29 +50,49 @@ _SYSTEM = (
 )
 
 
+# Priorita' dei PDF allegati: vogliamo IL bando, non moduli/domanda/cv/privacy.
+_PDF_PRIO = re.compile(r"avvis|band|selezion|decret|determin|incaric|reclutam", re.IGNORECASE)
+_PDF_SKIP = re.compile(r"modul|domand|allegat|\bcv\b|privacy|informativa|liberatoria", re.IGNORECASE)
+
+
+def _rank_pdfs(links: list[tuple[str, str]]) -> list[str]:
+    """Ordina (url, anchor) mettendo in cima il PDF che PROBABILMENTE e' il
+    bando e in fondo moduli/domande/cv, cosi' i primi `max_pdf` letti sono i
+    piu' utili (collegato alla roadmap: 'selezione PDF migliore')."""
+    def score(testo: str) -> int:
+        return (1 if _PDF_PRIO.search(testo) else 0) - (1 if _PDF_SKIP.search(testo) else 0)
+    return [u for u, _t in sorted(links, key=lambda x: -score(x[1]))]
+
+
 def testo_documento(url: str, timeout: int = 12, max_pdf: int = 3,
                     max_chars: int = _MAX_CHARS) -> str:
     """Testo del documento-bando: HTML visibile + testo dei primi PDF allegati,
     troncato a `max_chars` (tetto ai token/costo). Riusa il fetch del progetto e
-    `_pdf_text` di scadenza.py. "" se irraggiungibile."""
-    from .fetch import extract_links, fetch_bytes, fetch_with_fallback, visible_text
+    `_pdf_text` di scadenza.py. "" se irraggiungibile o se l'HTML e' solo
+    rumore (login SPID / pagina d'errore) senza PDF utili."""
+    from .fetch import (bytes_to_text, extract_links, fetch_bytes,
+                        fetch_with_fallback, html_is_noise, visible_text)
     from .scadenza import _is_pdf_url, _pdf_text
 
     parti: list[str] = []
     if _is_pdf_url(url):
-        ok, _ct, data = fetch_bytes(url, timeout)
-        return (_pdf_text(data)[:max_chars]) if ok else ""
+        ok, ct, data = fetch_bytes(url, timeout)
+        return (bytes_to_text(ct, data, _pdf_text)[:max_chars]) if ok else ""
 
     r = fetch_with_fallback(url, timeout)
     if not r.ok:
         return ""
-    parti.append(visible_text(r.html))
+    # La parte HTML entra solo se NON e' rumore (login/errore/vuota): cosi' non
+    # mandiamo all'AI testo inutile, ma teniamo comunque gli eventuali PDF.
+    html_txt = visible_text(r.html)
+    if not html_is_noise(html_txt):
+        parti.append(html_txt)
     base = r.final_url or url
-    pdfs = [u for u, _t in extract_links(r.html, base) if _is_pdf_url(u)]
-    for pu in pdfs[:max_pdf]:
-        ok, _ct, data = fetch_bytes(pu, timeout)
+    links = [(u, t) for u, t in extract_links(r.html, base) if _is_pdf_url(u)]
+    for pu in _rank_pdfs(links)[:max_pdf]:
+        ok, ct, data = fetch_bytes(pu, timeout)
         if ok:
-            parti.append(_pdf_text(data))
+            parti.append(bytes_to_text(ct, data, _pdf_text))
         if sum(len(p) for p in parti) > max_chars:
             break
     return re.sub(r"\n{3,}", "\n\n", "\n\n".join(parti)).strip()[:max_chars]
@@ -146,8 +166,14 @@ def rivedi_bando(url: str, titolo_hint: str = "", categoria_hint: str = "",
             scad = None   # accetta solo ISO pulito
     else:
         scad = None
+    # Qui il documento NON era vuoto (il ramo doc-vuoto e' uscito prima con
+    # is_bando=None). Se il modello non si esprime (campo assente o null),
+    # vale "non e' un bando": is_bando=False -> finisce in esclusi_ai, NON in
+    # doc_vuoti. Cosi' ai_bando=NULL resta riservato al solo vero doc-vuoto e
+    # un finding leggibile non viene mai nascosto silenziosamente.
+    ib = data.get("is_bando")
     return {
-        "is_bando": data.get("is_bando"),
+        "is_bando": False if ib is None else ib,
         "scadenza": scad,
         "titolo": (data.get("titolo") or "").strip()[:160],
         "profilo": (data.get("profilo") or "").strip()[:60],

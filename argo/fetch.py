@@ -323,3 +323,45 @@ def visible_text(html: str) -> str:
     no_script = re.sub(r"<(script|style)\b.*?</\1>", " ", html,
                        flags=re.IGNORECASE | re.DOTALL)
     return re.sub(r"\s+", " ", _TAG_RE.sub(" ", no_script)).strip()
+
+
+# --- byte-allegato -> testo: un URL .pdf a volte serve HTML -------------------
+# Molte scuole espongono link ".pdf" che in realta' restituiscono una pagina
+# HTML (login SPID, redirect, errore, o l'albo servito come pagina). pypdf li
+# rifiuta (`invalid pdf header: b'<!DOC'`) lasciando il documento vuoto. Qui
+# distinguiamo i byte reali e, se sono HTML, ne estraiamo il testo visibile.
+
+def looks_like_html(ct: str, data: bytes) -> bool:
+    """True se i byte sembrano HTML/XML e non un PDF binario."""
+    if data.lstrip()[:5].startswith(b"%PDF"):
+        return False
+    head = data.lstrip()[:512].lower()
+    return ("html" in (ct or "")
+            or head[:1] == b"<" or b"<html" in head or b"<!doctype" in head)
+
+
+def bytes_to_text(ct: str, data: bytes, pdf_reader) -> str:
+    """Byte di un allegato-bando -> testo. `pdf_reader` e' una callable
+    bytes->str (passata da chi possiede pypdf, cosi' fetch.py resta a zero
+    dipendenze). PDF vero -> pdf_reader; HTML -> testo visibile; ignoto ->
+    tenta comunque il PDF (qualche server non mette il magic in testa)."""
+    if data.lstrip()[:5].startswith(b"%PDF"):
+        return pdf_reader(data)
+    if looks_like_html(ct, data):
+        return visible_text(data.decode("utf-8", "ignore"))
+    return pdf_reader(data)
+
+
+_NOISE_RE = re.compile(
+    r"(entra con spid|accedi con spid|autenticazione|area riservata"
+    r"|effettua(re)? (il )?login|sessione scaduta|access denied"
+    r"|pagina non trovata|errore 40\d|404 not found|forbidden)", re.IGNORECASE)
+
+
+def html_is_noise(text: str) -> bool:
+    """True se il testo visibile e' una pagina di login/errore/sostanzialmente
+    vuota: inutile mandarla all'AI (chiamata sprecata + rischio allucinazione)."""
+    t = (text or "").strip()
+    if len(t) < 120:
+        return True
+    return bool(_NOISE_RE.search(t[:1500]))
